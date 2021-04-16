@@ -1,7 +1,7 @@
 {
   "name": "cloudlink",
   "version": "0.1.0",
-  "main": "public/main.js",
+  "main": "src/main.js",
   "private": true,
   "dependencies": {
     "@microsoft/microsoft-graph-client": "^2.2.1",

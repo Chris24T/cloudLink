@@ -1,20 +1,8 @@
 /* eslint-disable no-unused-vars */
-
-const FileManager = require("file-manager");
 const fs = require("fs");
-const Path = require("path");
-const { SSL_OP_SSLEAY_080_CLIENT_DH_BUG } = require("constants");
-const { file } = require("googleapis/build/src/apis/file");
-const { partHandler } = require("./filePartHandler");
-const { get } = require("http");
-const { timeStamp } = require("console");
-const { mergeFiles } = require("split-file");
-const { create } = require("domain");
-const { callClients } = require("./auth/authController");
 
-const crypto = require("crypto");
-const { ChatLeft } = require("react-bootstrap-icons");
-const { report } = require("process");
+const { partHandler } = require("./filePartHandler");
+const { callClients } = require("./auth/authController");
 
 /**
  * Controls the interpreting of data to/from the APIs

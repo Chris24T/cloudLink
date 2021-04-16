@@ -2,8 +2,6 @@ const fs = require("fs");
 const readline = require("readline");
 
 const { google } = require("googleapis");
-const { ResponseType } = require("@microsoft/microsoft-graph-client");
-const { TelephoneMinus } = require("react-bootstrap-icons");
 
 const CLIENT_ID = process.env.GOOGLE_AUTH_CLIENT_ID,
   CLIENT_SECRET = process.env.GOOGLE_AUTH_CLIENT_SECRET,
