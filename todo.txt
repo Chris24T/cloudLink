@@ -1,0 +1,90 @@
+Fix broken file download: currently just download binary string, need to apply mimetype?
+
+current list files pulls out of cloud trash too
+
+plugin to redirect browser downloads to be sent straight to cloud
+
+"delete" cant send back to browser on success/failure - data serialization problem, cant do
+
+
+
+
+
+**************************
+PLAN
+
+ //read fileContent, assess change as date since modified and size
+
+        /** NOTHING ON CLOUD FOLDER SYNCING/UPOADING/NAVIGATING
+         * click download
+         * if (file exists locally -by id) checkSync(id)
+         * 
+         * function checksync(id) { //maybe run across all files so often, if drive set to replicate locally, else just on click download(i.e. works like "sync changes to local" buttton)
+         * 
+         *  fetch file: size and date since modified (online and offline version)
+         *  if one/or both changed, then cloud and offline versions differ -> check for need to sync
+         *  need to sync:
+         * 
+         *  single table - every cloud files representation as a chain of hashses
+         *  compute chain either : during uploading file via app
+         *                        
+         * will need in cloud File: 
+         * 
+         *        Each File: held in folder of name fileid+"fil", (+"fil" = file, +"fol" = folder)  
+         *        each filefolder contains: about.txt > meta data about file + the hash chain -> must rebuilt real chain out of file parts
+         *                                  series of 4MB portions of the total file, name=hash of the data block
+         * 
+         *  on download (sync):
+         * 
+         *    pull down just the file names (i.e. block hashes) from the cloud, rebuilt the hash chain as found in cloud
+         *    split the local file into 4MB chunks, retain order, tie self block hash to each block
+         *    line up the two chains: attempt to match hash chains between  online and local
+         *    ==> if blocks exist in cloud but not locally, download block, start building new chain using local blocks + any downloaded blocks
+         *    attempt to match the same hash chain as in the cloud by "cat" ing the blocks back again 
+         * 
+         *  on upload (sync):
+         * 
+         *      split file into 4MB chunks, find hash of each chunk
+         *      construct hash chaing just to remeber hash order
+         *      
+         *      pull down cloud hash chain,
+         *      
+         *      attempt to rebuild local chain in the cloud using cloud blocks and local blocks which dont exist in the cloud i.e. the ones needing uploading (preference to cloud files)
+         *      upon building chain locally, upload the local files which dont yet exist in cloud and edit about.txt to relfect new chain
+         * 
+         * compare hashing algorithms with number of blocks and size of blocks etc to find best - just ask why for everything ive done
+         *  
+         *  on download (no sync)
+         * 
+         *      No existing local file exists to produce a comparison chain
+         *      Just download whole chain
+         *      will need repo to "remember" the local files tied to the program e.g. just a single file where every file must be to appear in the app
+         * 
+         * on upload (no sync)
+         *      
+         *      check if "filename"+"fil" folder exists in cloud if not:
+         *      Split file into 4MB chunks locally
+         *      create cloud folder name: *filename*+"fil" - the FOLDER represents the FILE
+         *      Folder contents{
+         *      meta.txt - contains File meta data + File blockHash chain (i.e. a blocklist)
+         *      [series of file objects with name=blockHash, content = blockContent]
+         *       }
+         *      
+         * 
+         * 
+         * }
+
+            Does 4MB local equal 4MB cloud
+
+        */
+      
+
+      
+      //if local, check local against cloud hash, if different, init smartSync procedure
+
+
+      18/01/21
+
+      Design Progress:
+        Move folders all to top
+        files below in seperate div

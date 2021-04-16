@@ -1,0 +1,43 @@
+tree {
+    byIndex {
+        root {
+        childid1: childObj1
+        childid2: childObj2
+        childid3: childObj3
+    }
+
+    folder1 {
+
+    }
+
+    folder 2{
+
+    }
+
+    (all folders)
+    }
+    
+    byPath {
+        root {
+            children {
+                child: {
+                    children: {
+                        child {
+                            
+                        }
+                    }
+                }
+
+                child {
+
+                }
+
+                child {
+
+                }
+            }
+        }
+    }
+    
+
+}

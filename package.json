@@ -1,0 +1,63 @@
+{
+  "name": "cloudlink",
+  "version": "0.1.0",
+  "main": "public/main.js",
+  "private": true,
+  "dependencies": {
+    "@microsoft/microsoft-graph-client": "^2.2.1",
+    "@testing-library/jest-dom": "^5.11.6",
+    "@testing-library/react": "^11.2.2",
+    "@testing-library/user-event": "^12.2.2",
+    "bootstrap": "^4.5.3",
+    "bootstrap-icons": "^1.1.0",
+    "cross-blob": "^2.0.0",
+    "dotenv": "^8.2.0",
+    "dropbox": "^8.3.0",
+    "fetch": "^1.1.0",
+    "file-manager": "^2.0.0",
+    "flexbox-react": "^4.4.0",
+    "fs": "0.0.1-security",
+    "googleapis": "^65.0.0",
+    "http2": "^3.3.7",
+    "msal": "^1.4.4",
+    "react": "^17.0.1",
+    "react-bootstrap": "^1.4.0",
+    "react-bootstrap-icons": "^1.1.0",
+    "react-dom": "^17.0.1",
+    "react-dropzone": "^11.3.0",
+    "react-router-dom": "^5.2.0",
+    "react-scripts": "^4.0.0",
+    "simple-oauth2": "^4.2.0",
+    "spdy-transport": "^3.0.0",
+    "split-file": "^2.2.1",
+    "web-vitals": "^0.2.4"
+  },
+  "scripts": {
+    "react-start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "electron-start": "electron ."
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^11.0.2"
+  }
+}

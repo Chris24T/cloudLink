@@ -1,0 +1,124 @@
+.File {
+    resize: none;
+    width: 100px;
+    height: 125px;
+    background-color: lightblue;
+    word-wrap: break-word;
+    font-size: 10px;
+    margin: 5px;
+    order:2
+    
+
+}
+
+.FB-Files {
+    display: block;
+    width:100%;
+    
+
+}
+
+.FB-Files::before {
+    content:"";
+    /* display: inline-block; */
+    width: 95%;
+    background: black;
+    height: 1px;
+    display: flex;    
+    margin: 10px auto 10px auto;
+    
+}
+
+.FB-Folders{
+    
+    display: block;
+    position:relative;
+    width:100%
+
+}
+
+.FB-Folders::before {
+    content:"";
+    /* display: inline-block; */
+    width: 95%;
+    background: black;
+    height: 1px;
+    display: flex;    
+    margin: 10px auto 10px auto;
+    
+}
+
+.FB-Directory {
+    position: relative;
+    width:100%;
+    height:50px;
+    
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    
+    /* border-bottom: 1px solid black; */
+    
+    
+}
+
+.FB-Directory::after {
+   
+}
+
+.folder {
+    width:100px;
+    height:100px;
+    background-color: chocolate;    
+    margin: 5px;
+    order:1;    
+}
+
+
+
+#FileBrowser-Container {
+    display: flex;
+    flex-direction: row;
+    overflow-y:scroll;
+    scrollbar-width: none;
+    
+}
+
+#FileBrowser-Container::-webkit-scrollbar {
+    display: none;
+}
+
+
+
+#btnbar {
+    left:50%
+}
+
+#Sidebar {
+    position: absolute;
+    right:0;
+    background-color: cadetblue;
+    width:50px;
+    height:100%
+}
+
+#Navbar .navbtn  {
+    padding: 8px 8px 8px 32px;
+    text-decoration: none;
+    font-size: 25px;
+    display: block;
+}
+
+#Navbar .navbtn:hover  {
+   color:#f1f1f1
+}
+
+#capBox {
+    position: absolute; bottom:0px; width:100%; height:85px; background-color:red; padding:5px;
+    transition:.25s
+}
+
+#capBox.expand {
+    height: 150px;
+    background-color: aqua;
+}
