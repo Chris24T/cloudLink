@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useContext } from "react";
 
-//import './App.css';
-import 'bootstrap/dist/css/bootstrap.css';
-import FilesBrowser from "./components/FilesBrowser"
-import NavBar from "./components/Navbar"
-import SideBar from "./components/Sidebar"
+import "bootstrap/dist/css/bootstrap.css";
+import FilesBrowser from "./components/FilesBrowser";
+import NavBar from "./components/Navbar";
+import SideBar from "./components/Sidebar";
+import { browserContentContext } from "./Contexts/browserContentContext";
+
 import {
   BrowserRouter as Router,
   Switch,
@@ -12,34 +13,26 @@ import {
   Link,
   useLocation,
   useRouteMatch,
-  useParams
+  useParams,
 } from "react-router-dom";
 
-const { ipcRenderer, remote } = window.require('electron');
-
-function App() {  
-
+function App() {
   useEffect(() => {
-    
-    return () => {
-      
-    }
-  }, [])
+    return () => {};
+  }, []);
 
   return (
-    
     <div>
-         <Router>
-          <NavBar/>
-          <FilesBrowser/>  
-         </Router>
-          
-        <SideBar/>
-    </div>
-        
-  );
-   
-}
+      <browserContentContext.Provider value={{}}>
+        <Router>
+          <NavBar />
+          <FilesBrowser />
+        </Router>
 
+        <SideBar />
+      </browserContentContext.Provider>
+    </div>
+  );
+}
 
 export default React.memo(App);

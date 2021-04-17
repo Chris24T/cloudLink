@@ -17,14 +17,6 @@ class raidController {
       mode: 0,
       SmartSync_enabled: false,
     };
-
-    //console.log("table:", this.fileTable.getTable())
-
-    //"this" effectively attaches it to the (controller) object scope, rather than function scope
-    // the function scope stops existing after execution, so this makes it persist
-    //modes: Spanned, Raid0, Raid1, SmartSync
-
-    //test function (private)
   }
 
   /**
