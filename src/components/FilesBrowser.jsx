@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useContext } from 'react';
-
+import {browserContentContext } from "../Contexts/browserContentContext"
 import {
   FilesBrowser_PWD as FB_PWD, 
   FilesBrowser_Files as FB_FILES, 
@@ -25,12 +25,16 @@ const CHANNEL_NAME_RES = 'FileBrowser-Render-Response';
 
 function FilesBrowser(prps) {
 
+    const {dirStack, allFiles:fileTree, displayFiles:displayedFiles, setDisplayFiles} = useContext(browserContentContext)
+
     let
-    [displayedFiles, setDisplayedFiles] = useState([]), //all handling meta data, only handle reall data at donwload or upload (not read)
-          
-    dirStack = useRef([["home", "root"]]),  //name, id
-    fileTreeById = useRef({}),
-    fileTreeByPath = useRef({}),
+    //[displayedFiles, setDisplayedFiles] = useState([]), //all handling meta data, only handle reall data at donwload or upload (not read)
+    
+    setDisplayedFiles = setDisplayFiles,      
+    //dirStack = dirStack,  //name, id
+    //fileTree = useRef({}),
+    //fileTree = allFiles,
+    
     config = useRef({
 		mode:{
 			uploadType:2, 
@@ -49,7 +53,7 @@ function FilesBrowser(prps) {
     
     function findForeignFolders() {
       const foreignFolders = {}
-      const searchDir = fileTreeById.current["root"].children
+      const searchDir = fileTree.current["root"].children
 
       for( const folder of Object.values(searchDir)) {
         // found a foreign folder
@@ -63,7 +67,7 @@ function FilesBrowser(prps) {
     
     // need to return which folder specifically it exists in - append item to path (dirstack)
     //currently returning contianign folder as if target were a file, but a file can exist as a fodler itself, i need THAT fodler
-    function findExistingFileData(toFind, searchSpace=fileTreeById.current, foreignFolders, {mode}) {
+    function findExistingFileData(toFind, searchSpace=fileTree.current, foreignFolders, {mode}) {
       //default search space is global search space - recursive almost
       // want to change to currentDir
 	  
@@ -78,13 +82,13 @@ function FilesBrowser(prps) {
 		for(const [clietnId, foreignRef] of Object.entries(foreignFolders)) {
 
 			console.log(foreignRef)
-			const foreignFolder = fileTreeById.current[foreignRef[1]]
+			const foreignFolder = fileTree.current[foreignRef[1]]
 			console.log("foreign", foreignFolder)
 			for( const folder of Object.values(foreignFolder.children)) {
 
 				if(folder.name.includes("__"+clipName)) {
 					console.log("Containing Folder Found in current foreign:",folder)
-					const container = fileTreeById.current[folder.id]
+					const container = fileTree.current[folder.id]
 					fileData[container.origin] = ({
 						containingFolder:[container.name, container.id, container.origin],
 						parts:container.children
@@ -100,7 +104,7 @@ function FilesBrowser(prps) {
           // found target part-container
           if(resource.name.includes("__"+clipName) && resource.isFolder && (uploadType===2 || isSmart)) {
               console.log("Containing Folder Found in current DIR:",resource)
-			  const container = fileTreeById.current[resource.id]
+			  const container = fileTree.current[resource.id]
               fileData[resource.origin] = ({
                 containingFolder:[container.name, container.id, container.origin],
                 parts: container.children
@@ -173,7 +177,7 @@ function FilesBrowser(prps) {
 	  const dStack = dirStack.current
       const currentDirId = dStack[dStack.length - 1][1]
 	  console.log(currentDirId)
-      const currentDir = fileTreeById.current[currentDirId].children
+      const currentDir = fileTree.current[currentDirId].children
 	  const foreignFolders = findForeignFolders()
       const toUpload = [findExistingFileData(droppedFiles, currentDir, foreignFolders, cfg), foreignFolders]
       uploadFiles(toUpload)  
@@ -259,6 +263,7 @@ function FilesBrowser(prps) {
     }
 
   function HomeView({content, dirStack}) {
+    console.log("Rendering Content:", content)
     const {getRootProps, getInputProps, isDragActive} = useDropzone({onDrop})
 
     return (
@@ -374,7 +379,7 @@ function FilesBrowser(prps) {
     function uploadFiles([files, foreignFolders]) {
       const fullWorkingDir = dirStack.current // current working directory stack
       const containingDirId = fullWorkingDir[fullWorkingDir.length-1][1] // Top level directory (wokring directory) id
-      const containingDir = fileTreeById.current[containingDirId] // Get the containing folder by workingdir id
+      const containingDir = fileTree.current[containingDirId] // Get the containing folder by workingdir id
       const reqconfig = config.current // Upload config e.g. stripe
 		console.log("containingDir", containingDir)
       //What is config: dictates upload type - how?
@@ -536,20 +541,20 @@ function FilesBrowser(prps) {
       ipcRenderer.send(CHANNEL_NAME_REQ, [message, FILTERS])
       ipcRenderer.on("FileBrowser-Render-Response", (evnt, response) => {
         
-        fileTreeById.current = JSON.parse(response)
+        fileTree.current = JSON.parse(response)
         
 
-        //console.log("byId", fileTreeById.current)
+        //console.log("byId", fileTree.current)
         //console.log("byPath", fileTreeByPath.current)
         
         // Setting based on list file response
         let currentDirId = (dirStack.current[dirStack.current.length - 1])[1]
         
-        //console.log("tree", fileTreeById.current, "displaying ", currentDirId)
-        //onsole.log("ToDisplay", fileTreeById.current[currentDirId])
-        //console.log("AllocationTable:", fileTreeById.current)
+        //console.log("tree", fileTree.current, "displaying ", currentDirId)
+        //onsole.log("ToDisplay", fileTree.current[currentDirId])
+        //console.log("AllocationTable:", fileTree.current)
        console.log("displye", response)
-        setDisplayedFiles(fileTreeById.current[currentDirId].children)        
+        setDisplayedFiles(fileTree.current[currentDirId].children)        
         
       })
     }   
@@ -608,8 +613,8 @@ function FilesBrowser(prps) {
       dirStack.current = d      
 
       //setting based on file tree navigation
-      console.log("tree", fileTreeById.current)
-      setDisplayedFiles(fileTreeById.current[dId].children)
+      console.log("tree", fileTree.current)
+      setDisplayedFiles(fileTree.current[dId].children)
 
     }
 

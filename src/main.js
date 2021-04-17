@@ -51,6 +51,10 @@ const init = () => {
 
     return e.reply("FileBrowser-Render-Response", JSON.stringify(response));
   });
+
+  ipcMain.on("shutdown", async (e, messageContent) => {
+    app.exit();
+  });
 };
 
 /**
