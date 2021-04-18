@@ -230,7 +230,7 @@ class googleAuth {
     { targetDrive, targetPath, foreignFolders },
     { uploadType, isSmart }
   ) {
-    name = name.split(".").slice(0, -1).join(".");
+    //name = name.split(".").slice(0, -1).join(".");
     const vID = this.vendor;
     let pID;
     console.log("existingData", existingFileData);
@@ -361,7 +361,6 @@ class googleAuth {
   }
 
   createFolder(parent, name) {
-    console.log("GGL - Creating Folder: name ", name, " parentID", parent);
     let metaData = {
       name,
       parents: [parent],

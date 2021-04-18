@@ -9,6 +9,7 @@ function handleRequest(request) {
     "fileDownload-request": controller.downloadFiles,
     "deleteFile-request": controller.deleteFiles,
     "fileUpload-request": controller.uploadFiles,
+    "createFolder-request": controller.createFolder,
   };
 
   const { data, params } = request[0].requestBody,
