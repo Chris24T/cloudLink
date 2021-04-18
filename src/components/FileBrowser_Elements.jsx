@@ -1,4 +1,5 @@
 import React from "react"
+import { CodeSlash } from "react-bootstrap-icons"
 import Card from 'react-bootstrap/Card'
 import ButtonBar from "./ButtonBar"
 
@@ -21,7 +22,7 @@ export function FilesBrowser_PWD(props) {
     return (
 
         <div className="FB-Directory">
-            <span>path {window.location.pathname}</span>
+            <span>Path: {window.location.pathname}</span>
             {
             
             dStack.map(d => {
@@ -38,18 +39,18 @@ export function FilesBrowser_PWD(props) {
 
 export function FilesBrowser_Folders(props) {
     const 
-    folders = props.fd,
+    {folders, isPartitionLevel} = props.fd,
     folderFuncs = props.fdfunc
     //console.log("render folders", folders)
     
-    if (folders.length === 0) return <span>No Folders</span>
+    // if (folders.length === 0) return (
+    // <div className="FB-Folders">
+    //     <span>No Folders</span>
+    // </div>)
     return(
         
         <div className="FB-Folders" >
-        {Object.values(folders).map( (folder) => {
-            if (folder.name.includes("art#1") || folder.name.includes("art#2") || folder.name.includes("art#3") || folder.name.includes("art#4") || folder.name.includes("art#5")) {
-                return null
-            }
+        {Object.values(folders).map( (folder) => {            
         
             return(
                 
@@ -62,7 +63,9 @@ export function FilesBrowser_Folders(props) {
         
             )
         })}
-
+        <div className="folder" onClick={() => folderFuncs.onCreateFolder("NEW")}>
+        <span>Create New {isPartitionLevel ? "Partition" : "Folder"} </span>
+        </div>
         </div>
     )
 
@@ -72,20 +75,16 @@ export function FilesBrowser_Files(props) {
     const 
     files = props.fi,
     fileFuncs = props.fifunc
-    //console.log("render files", files)
+    console.log("Rendering Files HERE", files)
 
-    if (files.length === 0) return <span> No Files</span>
+    //if (files.length === 0) return <span> No Files</span>
     return (
 
         
         <div className="FB-Files"> 
         {Object.values(files).map( (file) => {
 
-        if (file.name.includes("art#1") || file.name.includes("art#2") || file.name.includes("art#3") || file.name.includes("art#4") || file.name.includes("art#5")) {
-           return null             
-        }
-
-        if (file.name.includes("art#0")) file.name = file.name.slice(0, -11)+".txt"
+        
 
             return (
                 <Card 
@@ -94,9 +93,12 @@ export function FilesBrowser_Files(props) {
                 bg="light" 
                 >
 
-                <Card.Header style={{height:"50px", resize:"none"}}>{file.name} {originDisplay(file)} </Card.Header>
+                <Card.Header style={{height:"50px", resize:"none"}}>
+                    <span>
+                    {file.name}
+                    </span> {originDisplay(file)} </Card.Header>
 
-                <Card.Body style={{textAlign:"center"}}>                
+                <Card.Body style={{textAlign:"center", padding:0}}>                
                     
                     <img 
                         className="img-thumbnail"
@@ -113,11 +115,12 @@ export function FilesBrowser_Files(props) {
                     </img> 
                     
                 </Card.Body>
-                <Card.Footer style={{width:"100%", height:"50px", bottom:"0px"}}>
-                    <ButtonBar id="btnbar" 
+                <Card.Footer style={{position:"absolute", width:"100%", height:"50px", bottom:"0px", padding:0}}>
+                    <ButtonBar id="btnbar" className="btnBar" 
                         funcDownload={() => fileFuncs.download(file)} 
                         funcDelete={() => fileFuncs.delete(file.id)}
                         style={{
+                            display:"flex",
                         position:"relative",
                         width:"150px",
                         }}>
@@ -153,6 +156,7 @@ export function Control_Bar(props) {
                 <button id="smartBtn" onClick={props.toggleSmartUpload}>Smart Upload Disabled</button>
                 <button onClick={props.back}>Back</button>
                 <button onClick={props.refresh}>Refresh</button>
+                <button onClick={props.toggleDisplayMode}>Toggle DisplayMode</button>
                 
             </div>
         </div>
@@ -165,8 +169,23 @@ function toggleClass(el, className) {
     el.classList.toggle(className) 
 };
 
-function originDisplay({origin="other"}) {
+function originDisplay({origin="other", originSet}) {
     
+
+    if(originSet && originSet.length !== 0) {
+        originSet.sort()
+        console.log("OS", originSet)
+        return (
+            <div className="originsDisplay">
+                {originSet.map( originID => {
+                    return (
+                    <span className="dot" style={{ backgroundColor:drivesStyle[originID].color }}> </span>
+                    )
+                })}
+            </div>
+        )
+    }
+
     const c = drivesStyle[origin].color
     // return a dot per location,
     // styled to above colour

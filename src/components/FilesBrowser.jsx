@@ -8,7 +8,7 @@ import {
  } from "./FileBrowser_Elements";
 
 
-import {NukeButton} from "./NukeButton"
+
 import {useDropzone} from "react-dropzone"
 import {
   BrowserRouter as Router,
@@ -25,7 +25,9 @@ const CHANNEL_NAME_RES = 'FileBrowser-Render-Response';
 
 function FilesBrowser(prps) {
 
-    const {dirStack, allFiles:fileTree, displayFiles:displayedFiles, setDisplayFiles} = useContext(browserContentContext)
+    const {dirStack, allFiles:fileTree, displayFiles:displayedFiles, setDisplayFiles, activePartition=true} = useContext(browserContentContext)
+    const [displayMode, setDisplayMode] = useState("simple")
+    const [displayForm, setDisplayForm] = useState(true)
 
     let
     //[displayedFiles, setDisplayedFiles] = useState([]), //all handling meta data, only handle reall data at donwload or upload (not read)
@@ -36,12 +38,13 @@ function FilesBrowser(prps) {
     //fileTree = allFiles,
     
     config = useRef({
-		mode:{
-			uploadType:2, 
-			isSmart:0},      
+      displayType:displayMode,
+      mode:{
+        uploadType:2, 
+        isSmart:0},      
         connectedDrives: ["dropbox","google"], //order here decides who gets frist part - must match target drive
-    	blockWidth:2000
-    })    
+        blockWidth:2000
+    })   
 
     useEffect(() => {
       console.log("init render")      
@@ -53,7 +56,7 @@ function FilesBrowser(prps) {
     
     function findForeignFolders() {
       const foreignFolders = {}
-      const searchDir = fileTree.current["root"].children
+      const searchDir = fileTree?.current["root"]?.children || {}
 
       for( const folder of Object.values(searchDir)) {
         // found a foreign folder
@@ -73,11 +76,11 @@ function FilesBrowser(prps) {
 	  
         console.log("Searching in", searchSpace)
      	const files = []
-		const {uploadType, isSmart} = mode
+		  const {uploadType, isSmart} = mode
       for( const item of toFind ) {
-		const clipName =  item.name.split(".").slice(0, -1).join(".")
+		    const clipName =  item.name.split(".").slice(0, -1).join(".")
         let fileData = {}
-		console.log("f",Object.entries(foreignFolders))
+		    console.log("f",Object.entries(foreignFolders))
 		//search foreign folders for data
 		for(const [clietnId, foreignRef] of Object.entries(foreignFolders)) {
 
@@ -86,7 +89,7 @@ function FilesBrowser(prps) {
 			console.log("foreign", foreignFolder)
 			for( const folder of Object.values(foreignFolder.children)) {
 
-				if(folder.name.includes("__"+clipName)) {
+				if(folder.name.includes("__"+/*clipName*/item.name)) {
 					console.log("Containing Folder Found in current foreign:",folder)
 					const container = fileTree.current[folder.id]
 					fileData[container.origin] = ({
@@ -94,7 +97,6 @@ function FilesBrowser(prps) {
 						parts:container.children
 					})
 				}
-
 			}
 		}
 
@@ -213,7 +215,7 @@ function FilesBrowser(prps) {
       
       <React.Fragment>   
       <Route exact path="/">        
-      <HomeView content={displayedFiles} dirStack={dirStack}/>
+      <HomeView content={displayMode === "advanced" ? displayedFiles : buildDisplay(displayedFiles, findForeignFolders(),fileTree.current)} dirStack={dirStack}/>
       </Route>
 
       <Route path="/trash"  >        
@@ -234,7 +236,7 @@ function FilesBrowser(prps) {
     
     // Both of the following are the same:
     // return <HomeView content={displayedFiles} dirStack={dirStack}/>
-    //return HomeView(displayedFiles, dirStack) 
+    // return HomeView(displayedFiles, dirStack) 
     
     function TrashView() {
       return (
@@ -255,16 +257,74 @@ function FilesBrowser(prps) {
     function DrivesView() {
       return (
         <div id="FileBrowser-Container" >
-          <div id="nukeDrives_btn">
-          <NukeButton/>
-          </div>
+          <span>drivey wivey</span>
         </div>
       )
+    }
+
+    function formView(isPartition) {
+      console.log("partigion", isPartition)
+      //https://medium.com/@everdimension/how-to-handle-forms-with-just-react-ac066c48bd4f
+      //https://css-tricks.com/html5-meter-element/
+      return (
+        <div className="folderForm">
+          <span><h4>{isPartition ? "Create A Partition" : "Create A Folder"} </h4></span>
+          <form id="createFolder" onSubmit={handleCreateFolderFormSubmit}>
+            <label for="folderName"> Name your new {isPartition ? "Partition" : "Folder"} </label>
+            <input onChange={() => {console.log("edit")}} type="text" name="folderName" defaultValue="MyFolder"/><br></br>
+
+            <label for="isSmart"> Select The Drives To Connect </label>
+            <label for="driveSelect-google"> Google </label>
+            <input type="checkbox"  id="driveSelect-google" value="google" name="isSmart"/>
+            <meter></meter>
+            <label for="driveSelect-dropbox"> Dropbox </label>
+            <input type="checkbox"  id="driveSelect-dropbox" value="dropbox" name="isSmart"/>
+            <meter></meter>
+          
+            {isPartition ? partitionForm() : ""}
+
+            <button type="submit" ></button>
+          </form>
+        </div>
+      )
+
+      function partitionForm() {
+        //https://stackoverflow.com/questions/28438485/change-form-contents-dynamically
+        return (
+          <React.Fragment>
+            <label for="mode"> Select The RAID mode of this partition </label>
+          
+            <select name="mode" id="mode-Form"> 
+              <option value="0" disabled="true">Span</option>
+              <option value="1">Mirror</option>
+              <option value="2">Stripe</option>
+              <option value="3">Stipe-Mirror</option>
+            </select>
+
+            <label for="isSmart"> Enable Smart Uploads on this partition </label>
+            <label for="isSmart-enabled"> Enabled </label>
+            <input type="radio"  id="isSmart-enabled" value="1" name="isSmart"/>
+            <label for="isSmart-disabled"> Disabled </label>
+            <input type="radio"  id="isSmart-disabled" value="0" name="isSmart"/>
+          </React.Fragment>  
+        )
+      }
+      
     }
 
   function HomeView({content, dirStack}) {
     console.log("Rendering Content:", content)
     const {getRootProps, getInputProps, isDragActive} = useDropzone({onDrop})
+
+    // if(dirStack.current.length === 1) return (
+    //   <div>
+
+                   
+
+    //   </div>
+    // )
+
+    if(!activePartition) return <div></div>
 
     return (
       
@@ -273,7 +333,10 @@ function FilesBrowser(prps) {
           
 
           {            
-            isDragActive ? <p>drop here</p> : <p>drag and drop a file anywhere to upload</p>
+            //isDragActive ? <p>drop here</p> : <p>drag and drop a file anywhere to upload</p>
+            // set to true when click on "create folder " button
+            // set to false on complete or exit form
+            displayForm ? formView(dirStack.current.length === 1) : ""
           }
           
           {
@@ -283,31 +346,37 @@ function FilesBrowser(prps) {
               console.log("Rendering", Object.values(content).length, "files")
               
               Object.values(content).forEach( file => {        
-                //if (file.head) file = file.head        
-                if (file.isFolder) {                  
-                  folders[folders.length] = file
-                  return 
-                }
-                
-                files[files.length] = file                
+                //if (file.head) file = file.head
+                if(!file.isHidden) {
+                  if (file.isFolder) {                  
+                    folders[folders.length] = file
+                    return 
+                  }
+                  
+                  files[files.length] = file 
+                }  
+                               
               })
-              //console.log("Rendering:", folders, files)
+              
               return (
 
                 
-                <React.Fragment>                  
+                <React.Fragment>                                  
                   
+                  
+
                   <FB_PWD
                     d={dirStack.current}
                     func1={ changeWorkingDirectory }/>
                  
                   <FB_FOLDERS
-                    fd={folders}
+                    fd={{folders, "isPartitionLevel": (dirStack.current.length === 1) }}
                     fdfunc=
                     {{
-                      "onClickChild":changeWorkingDirectory
+                      "onClickChild":changeWorkingDirectory,
+                      "onCreateFolder": createFolderForm
                     }}
-                    />
+                    />                    
                   
                   <FB_FILES
                     fi={files}
@@ -324,15 +393,85 @@ function FilesBrowser(prps) {
             })()
           }
 
-         
-
-          
-
-            <ControlBar toggleSmartUpload={() => toggleSmartUpload(config.current)}refresh={fetchFileData} speak={() => console.log("hello")} back={() => changeWorkingDirectory("back") }  setConfig={(e) => setConfig(e)}></ControlBar>
+            <ControlBar toggleDisplayMode={() => toggleDisplayMode()} toggleSmartUpload={() => toggleSmartUpload(config.current)} refresh={fetchFileData} speak={() => console.log("hello")} back={() => changeWorkingDirectory("back") }  setConfig={(e) => setConfig(e)}></ControlBar>
           
         </div>
 
     )
+  }
+  function toggleDisplayMode() {
+    
+    if(displayMode === "simple") return setDisplayMode("advanced")
+    setDisplayMode("simple")
+    
+  }
+
+  function createFolderForm(name) {
+    setDisplayForm(true)
+  }
+
+  function handleCreateFolderFormSubmit(event) {
+    event.preventDefault()
+    console.log(event)
+
+    const dir = dirStack.current
+    const target = fileTree.current[dir[dir.length - 1][1]].origin
+    const name = event.name
+
+    const requestBody = {
+        params: {        
+          targetDrive: target || "google",
+          targetPath: dir,                  
+        },
+        data: {
+          name
+        }
+      }
+
+      const request = {
+        requestType:"createFolder-request",        
+        requestBody
+      }
+
+    ipcRenderer.send(CHANNEL_NAME_REQ, [request])
+  }
+
+  function buildDisplay(toDisplay, foreigns, allFiles) {
+    
+    const newDisplay = {}  
+
+    for(const item of Object.values(toDisplay)) {
+      const newItem = JSON.parse(JSON.stringify(item))
+      newItem.originSet = [item.origin]
+      if(item.name.includes("__") && item.isFolder) {        
+        if(item.name.includes("foreign")) {          
+          newItem.isHidden = true
+        }
+        else {
+          newItem.name = item.name.slice(2, item.name.length) //slicing off "__" identifier
+          //check if item appears in the foreign folder set, to accumulate "origins"
+          for(const [owner, folder] of Object.entries(foreigns)) {
+            
+            const foreignParts = allFiles[folder[1]].children
+            for(const {name} of Object.values(foreignParts)) {
+              const trimName = name.slice(2, name.length)
+              if(item.name.includes(trimName)) newItem.originSet.push(owner) 
+            }
+
+            
+            
+                       
+          }
+        }
+        //Found a parts folder
+        // want to convert to a file representation
+        newItem.isFolder = false
+      }
+
+      newDisplay[item.id] = newItem
+    }
+    console.log("generatedDisplay", newDisplay)
+    return newDisplay
   }
 
   function toggleSmartUpload(cfg) {
@@ -412,44 +551,6 @@ function FilesBrowser(prps) {
       }
 
       return ipcRenderer.send(CHANNEL_NAME_REQ, [request])
-
-      const cfg = config.current,
-      dir = dirStack.current
-
-      //must be mapped from DOM object to JS object ((made void =>))(no longer used -> just extracting path and sending)
-      const filesJSON = Object.values(files).map( f => {
-        return (
-          {
-            "path":f.path,
-            "app_path": dir,
-            "lastModified":f.lastModified,
-            "lastModifiedDate":f.lastModifiedDate,
-            "name":f.name,
-            "size":f.size,
-            "type":f.type,
-            "parent":dir.reverse()[1],
-            "parentPath":f.parentPath,
-            "origin":f.origin
-          }
-        )
-      })      
-      
-      let message={
-        requestType:"fileUpload-request",        
-        requestBody:{
-          params:{
-            recipients:cfg.connectedDrives,
-            mode:cfg.mode,
-            width:cfg.width || "",
-            dir:dir,
-            isSmart:cfg.isSmart
-          },
-          data:filesJSON,          
-        }
-      }
-      
-      ipcRenderer.send(CHANNEL_NAME_REQ, [message])
-
     }
 
     
@@ -563,7 +664,7 @@ function FilesBrowser(prps) {
       let 
       d = dirStack.current, 
       dlen = dirStack.current.length,
-      dstr = "root", dId = "root"
+      dstr = "home", dId = "root"
 
       if (dnext) [dstr, dId] = dnext      
       if(d.length === 1 && op==="back") return  
@@ -573,7 +674,7 @@ function FilesBrowser(prps) {
         // clicking on back button
           if (!dnext) {
             
-            if(d[d.length - 1][0] === "root") {
+            if(d[d.length - 1][0] === "home") {
               console.log("already at home")
               return;
             }

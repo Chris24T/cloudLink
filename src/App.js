@@ -53,6 +53,7 @@ function App() {
       >
         <Router>
           <NavBar />
+
           <FilesBrowser />
 
           <SideBar actions={{ shutdown, refreshContent }} />

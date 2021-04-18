@@ -1,6 +1,7 @@
 require("dotenv").config();
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 
+const partitionDB = require("node-localdb")("./partitions.json");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const { handleRequest } = require("./requestHandler");
 
 function createWindow() {

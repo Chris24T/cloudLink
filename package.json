@@ -20,6 +20,7 @@
     "googleapis": "^65.0.0",
     "http2": "^3.3.7",
     "msal": "^1.4.4",
+    "node-localdb": "0.0.3",
     "react": "^17.0.1",
     "react-bootstrap": "^1.4.0",
     "react-bootstrap-icons": "^1.1.0",

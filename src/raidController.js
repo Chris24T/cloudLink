@@ -1,6 +1,8 @@
 /* eslint-disable no-unused-vars */
 const fs = require("fs");
 
+const paritionInfoDB = require("node-localdb")("./partitionDB.json");
+
 const { partHandler } = require("./filePartHandler");
 const { callClients } = require("./auth/authController");
 
@@ -65,7 +67,30 @@ class raidController {
     });
   }
 
-  downloadFiles() {}
+  createFolder({ targetDrive, targetPath }, { name }) {
+    console.log("CREATING FOLDER in", targetPath);
+
+    window.open("localhost:3000/settings");
+    return;
+    if (targetDrive === "google") {
+      console.log("Createing Folder-GGL");
+      callClients(
+        (clientId, client) => {
+          const parentId = targetPath[targetPath.length - 1][1];
+          client.createFolder(parentId, name);
+        },
+        ["google"]
+      );
+    } else if (targetDrive === "dropbox") {
+      console.log("Createing Folder-DBX");
+      callClients(
+        (clientId, client) => {
+          client.createFolder(targetPath, name);
+        },
+        ["dropbox"]
+      );
+    }
+  }
 
   deleteFiles() {}
 
@@ -86,6 +111,8 @@ class raidController {
     });
 
     return Promise.all(clientResponses).then((fileLists) => {
+      console.log("Drobox", fileLists[0].entries);
+      console.log("Google", fileLists[1].entries);
       return formatLists(fileLists);
     });
   }
@@ -373,7 +400,7 @@ raidController.prototype.downloadFiles = function downloadFiles(data) {
 
 async function formatLists(lists) {
   const formatOptions = {
-    google: allocateChildren,
+    google: _formatGoogle,
     dropbox: _formatDropbox,
   };
   let parentList = {
@@ -398,7 +425,47 @@ async function formatLists(lists) {
     };
   }
 
-  //console.log("plist", parentList)
+  parentList["-1"] = {
+    name: "p_Unrecognised Files",
+    id: "-1",
+    origin: "other",
+    isPartitionFolder: true,
+    isFolder: true,
+    children: {},
+  };
+
+  parentList["root"].children["-1"] = parentList["-1"];
+
+  //moving unrecognised top level files to "unknown partition" folder
+  const rootChildren = parentList["root"].children;
+
+  for (let file of Object.values(rootChildren)) {
+    if (file.isFolder) file = parentList[file.id];
+    if (!file || !file.isPartitionFolder) {
+      parentList["-1"].children[file.id] = file;
+      delete rootChildren[file.id];
+    }
+  }
+
+  //assinging partion info from local store to partion folders
+  for (let partition of Object.values(rootChildren)) {
+    // not inspecting "unkonwn parition"
+    if (partition.id !== "-1") {
+      // paritionInfoDB.insert({
+      //   id: partition.id,
+      //   mode: 0,
+      //   isSmart: 0,
+      //   connectedDrives: {
+      //     google: { totalCapacity: 1000, usage: 100 },
+      //     dropbox: { totalCapacity: 1001, usage: 50 },
+      //   },
+      // }); //capacities:google[usage, max]
+      partition.config = await paritionInfoDB.find({ id: partition.id });
+      console.log("paritionConfig", partition.config);
+    }
+  }
+
+  console.log("plist", parentList);
 
   return parentList;
 
@@ -411,9 +478,13 @@ async function formatLists(lists) {
         const parentName = el.path_display.split("/").reverse()[1] || "home";
 
         if (el[".tag"] === "folder") {
+          if (el.name.includes("p_")) {
+            el.isPartitionFolder = true;
+          }
           acc[el.name] = acc[el.name] || {
             id: el.id,
             name: el.name,
+            isPartitionFolder: el.isPartitionFolder,
             isFolder: true,
             origin: "dropbox",
             children: {},
@@ -452,72 +523,122 @@ async function formatLists(lists) {
       acc[el.id] = el;
       return acc;
     }, {});
-
+    console.log("dbx map", listById);
     return listById;
   }
 
-  function allocateChildren(list, driveOwner) {
-    let map = generateMapping(list);
-    //if (!map["root"]) map["root"] = {children:{}}
+  function _formatGoogle(list, driveOwner) {
+    return list.reduce(
+      (acc, el) => {
+        if (el.shared) return acc;
 
-    return map;
+        let parentID = el.parents[0];
 
-    async function generateMapping(list) {
-      await list;
-      const map = Object.entries(await list).reduce((acc, fileEntry) => {
-        // console.log("acc, ", acc)
-        // console.log("file", fileEntry)
-        let key = fileEntry[0],
-          file = fileEntry[1];
+        if (parentID === "0AMLhUsJJYsZFUk9PVA") parentID = "root";
 
-        if (key === "root") key = "home";
-        //const fileIsTrash = file.labels.trashed
-        if (file.shared) return acc;
-        // add current parent to acc if its not there already
-        // if parent exists already, add current to parent child
-        // if not exists, create the entry, and give it child property, add current as child
-        file.origin = driveOwner;
-        const cId = file.id,
-          cname = file.name,
-          parents = file.parents;
-        let pId = parents ? parents[0] : file.parent;
-        if (pId === "0AMLhUsJJYsZFUk9PVA") pId = "root";
+        el.isPartitionFolder = false;
 
-        let parent = acc[pId];
+        if (el["mimeType"].includes("folder")) {
+          if (el.name.includes("p_")) {
+            el.isPartitionFolder = true;
+          }
 
-        //folder creator
-        if (!parent) {
-          acc[pId] = {
+          acc[el.id] = acc[el.id] || {
+            id: el.id,
+            name: el.name,
+            isPartitionFolder: el.isPartitionFolder,
             isFolder: true,
+            origin: "google",
             children: {},
           };
+
+          acc[el.id].name = el.name;
         }
 
-        acc[pId].children[cId] = file;
+        const parent = acc[parentID] || {
+          name: null,
+          children: {},
+          origin: "google",
+          id: parentID,
+        };
 
-        // info/meta loader
-        if (
-          file.mimeType === "application/vnd.google-apps.folder" ||
-          file[".tag"] === "folder"
-        ) {
-          file.isFolder = true;
-          if (acc[cId]) acc[cId] = { ...file, ...acc[cId] };
-          else acc[cId] = { ...file, children: {} };
-        }
+        parent.children[el.id] = {
+          id: el.id,
+          isFolder: el["mimeType"].includes("folder"),
+          name: el.name,
+          origin: "google",
+        };
+
+        acc[parentID] = parent;
 
         return acc;
-
-        // if current is folder
-        // //do parent procedure
-        // but do a current folder checkalso:
-        // if current folder is not in acc, add it, with child property,
-        // if it is already, just give it its meta
-      }, {});
-
-      return map;
-    }
+      },
+      {
+        home: {
+          id: "root",
+          name: "home",
+          children: {},
+        },
+      }
+    );
   }
 }
+//     await list;
+//     const map = Object.entries(await list).reduce((acc, fileEntry) => {
+//       // console.log("acc, ", acc)
+//       // console.log("file", fileEntry)
+//       let key = fileEntry[0],
+//         file = fileEntry[1];
+
+//       if (key === "root") key = "home";
+
+//       //ignoring shared files
+//       if (file.shared) return acc;
+
+//       // add current parent to acc if its not there already
+//       // if parent exists already, add current to parent child
+//       // if not exists, create the entry, and give it child property, add current as child
+//       file.origin = "google";
+//       const cId = file.id,
+//         cname = file.name,
+//         parents = file.parents;
+//       let pId = parents ? parents[0] : file.parent;
+//       if (pId === "0AMLhUsJJYsZFUk9PVA") pId = "root";
+
+//       let parent = acc[pId];
+
+//       //folder creator
+//       if (!parent) {
+//         acc[pId] = {
+//           isFolder: true,
+//           children: {},
+//         };
+//       }
+
+//       acc[pId].children[cId] = file;
+
+//       // info/meta loader
+//       if (
+//         file.mimeType === "application/vnd.google-apps.folder" ||
+//         file[".tag"] === "folder"
+//       ) {
+//         file.isFolder = true;
+//         if (acc[cId]) acc[cId] = { ...file, ...acc[cId] };
+//         else acc[cId] = { ...file, children: {} };
+//       }
+
+//       return acc;
+
+//       // if current is folder
+//       // //do parent procedure
+//       // but do a current folder checkalso:
+//       // if current folder is not in acc, add it, with child property,
+//       // if it is already, just give it its meta
+//     }, {});
+
+//     return map;
+//   }
+// }
 
 //read (meta)
 raidController.prototype.listFilesOLD = function () {

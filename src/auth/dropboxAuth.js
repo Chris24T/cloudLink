@@ -137,13 +137,32 @@ class dropboxAuth {
     function _downloadFile() {}
   }
 
+  createFolder(path, name) {
+    let tPath =
+      "/" +
+      path.reduce((acc, [name, id]) => {
+        if (id === "root") return acc;
+        return acc + name + "/";
+      }, "");
+
+    tPath += name;
+
+    console.log("dropboxCreatefolder", tPath);
+
+    this.authorize((client) => {
+      client.filesCreateFolderV2({
+        path: tPath,
+      });
+    });
+  }
+
   findPath(
     { name, existingFileData },
     { targetDrive, targetPath, foreignFolders },
     { uploadType, isSmart }
   ) {
     //cutting off extension
-    name = name.split(".").slice(0, -1).join(".");
+    //name = name.split(".").slice(0, -1).join(".");
     const vID = this.vendor;
     let path;
 
