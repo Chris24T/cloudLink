@@ -21,6 +21,7 @@ function App() {
   const dirStack = useRef([["home", "root"]]);
   const allFiles = useRef({});
   const [displayFiles, setDisplayFiles] = useState({});
+  const [currentFolderSize, setCurrentFolderSize] = useState([]);
 
   useEffect(() => {
     return () => {};
@@ -49,6 +50,8 @@ function App() {
           allFiles,
           displayFiles,
           setDisplayFiles,
+          currentFolderSize,
+          setCurrentFolderSize,
         }}
       >
         <Router>

@@ -93,7 +93,7 @@ class googleAuth {
             pageSize: 500,
             q: toList && "name='" + toList + "'", //? why isnt it ||
             fields:
-              "nextPageToken, files(id, name, thumbnailLink, mimeType, parents, shared)",
+              "nextPageToken, files(id, name, thumbnailLink, mimeType, parents, shared, quotaBytesUsed)",
             responseType: "stream",
           },
           (err, res) => {
@@ -364,6 +364,54 @@ class googleAuth {
     let metaData = {
       name,
       parents: [parent],
+      mimeType: "application/vnd.google-apps.folder",
+    };
+
+    return new Promise((res, rej) => {
+      this.authorize((client) => {
+        client.files.create(
+          {
+            resource: metaData,
+            fields: "id",
+          },
+          (err, resp) => {
+            if (err) rej(err);
+            else res(resp);
+          }
+        );
+      });
+    });
+  }
+
+  createPartitionFolder(name) {
+    const parentId = ROOTID;
+    let metaData = {
+      name,
+      parents: [parentId],
+      mimeType: "application/vnd.google-apps.folder",
+    };
+
+    return new Promise((res, rej) => {
+      this.authorize((client) => {
+        client.files.create(
+          {
+            resource: metaData,
+            fields: "id",
+          },
+          (err, resp) => {
+            if (err) rej(err);
+            else res(resp);
+          }
+        );
+      });
+    });
+  }
+
+  createFolderByPath(path, name) {
+    const parentId = path[path.length - 1][1]["google"][0];
+    let metaData = {
+      name,
+      parents: [parentId],
       mimeType: "application/vnd.google-apps.folder",
     };
 

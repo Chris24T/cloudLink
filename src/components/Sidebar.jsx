@@ -21,7 +21,7 @@ function SideBar({actions}) {
 
         <div id="Sidebar" >
         <Link to="/">
-        <div className="Sidebar_Button" style={{height:"80px"}} onClick={() => {dirStack.current = [["home", "root"]]; setDisplayFiles(allFiles.current["root"].children) }} >
+        <div className="Sidebar_Button" style={{height:"80px"}} onClick={() => {dirStack.current = [["home", "root"]]; setDisplayFiles(allFiles.current["home"].children) }} >
             
             <span className="tooltiptext">Home</span>            
             <svg style={{width:"100%", position:"relative", top:"30%"}} xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-house-fill" viewBox="0 0 16 16">
@@ -33,7 +33,7 @@ function SideBar({actions}) {
         </Link>
 
         <Link to="/"> 
-        <div className="Sidebar_Button" onClick={() => { if (dirStack.current.length === 1) return ; dirStack.current.pop(); setDisplayFiles(allFiles.current[dirStack.current[dirStack.current.length - 1][1]].children)}}> 
+        <div className="Sidebar_Button" onClick={() => { if (dirStack.current.length === 1) return ; dirStack.current.pop(); setDisplayFiles(allFiles.current[dirStack.current[dirStack.current.length - 1][0]].children)}}> 
         
             <span className="tooltiptext">Back</span>
             <svg style={{width:"100%", position:"relative", top:"10%"}} display="inline-block" xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-arrow-return-left" viewBox="0 0 16 16">
@@ -52,6 +52,17 @@ function SideBar({actions}) {
             </svg>            
         </div>
         </Link>
+
+        <Link to="/">
+            <div className="Sidebar_Button" onClick={() =>{}}>
+
+                <span className="tooltiptext">Partitions</span>
+                <svg style={{left:"5px", position:"relative", top:"20%", paddingBottom:"6px"}} xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-columns" viewBox="0 0 16 16">
+                    <path d="M0 2a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1V2zm8.5 0v8H15V2H8.5zm0 9v3H15v-3H8.5zm-1-9H1v3h6.5V2zM1 14h6.5V6H1v8z"/>
+                </svg>
+            </div>
+        </Link>
+        
 
              <div className="SidebarBottom_ButtonGroup">                
              <Link to="/settings" styleclassName="navbtn">

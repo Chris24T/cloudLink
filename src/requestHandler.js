@@ -16,7 +16,7 @@ function handleRequest(request) {
     reqType = request[0].requestType;
   console.log("recieved", data);
   const response = requestOptions[reqType](params, data);
-
+  //response.then((val) => console.log("generated", val));
   return response;
 }
 

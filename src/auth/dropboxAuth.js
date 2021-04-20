@@ -137,7 +137,17 @@ class dropboxAuth {
     function _downloadFile() {}
   }
 
-  createFolder(path, name) {
+  createPartitionFolder(name) {
+    const tPath = "/" + name;
+
+    return this.authorize((client) => {
+      return client.filesCreateFolderV2({
+        path: tPath,
+      });
+    });
+  }
+
+  createFolderByPath(path, name) {
     let tPath =
       "/" +
       path.reduce((acc, [name, id]) => {
@@ -149,8 +159,8 @@ class dropboxAuth {
 
     console.log("dropboxCreatefolder", tPath);
 
-    this.authorize((client) => {
-      client.filesCreateFolderV2({
+    return this.authorize((client) => {
+      return client.filesCreateFolderV2({
         path: tPath,
       });
     });

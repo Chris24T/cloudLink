@@ -25,7 +25,7 @@ const CHANNEL_NAME_RES = 'FileBrowser-Render-Response';
 
 function FilesBrowser(prps) {
 
-    const {dirStack, allFiles:fileTree, displayFiles:displayedFiles, setDisplayFiles, activePartition=true} = useContext(browserContentContext)
+    const {dirStack, setCurrentFolderSize, allFiles:fileTree, displayFiles:displayedFiles, setDisplayFiles, activePartition=true} = useContext(browserContentContext)
     const [displayMode, setDisplayMode] = useState("simple")
     const [displayForm, setDisplayForm] = useState(true)
 
@@ -39,6 +39,7 @@ function FilesBrowser(prps) {
     
     config = useRef({
       displayType:displayMode,
+      partitionConfig:"",
       mode:{
         uploadType:2, 
         isSmart:0},      
@@ -53,6 +54,12 @@ function FilesBrowser(prps) {
       
     
     },[])
+
+    useEffect( () => {
+      const currentDir = dirStack.current[dirStack.current.length-1][0]
+      console.log("dir", currentDir)
+      setCurrentFolderSize(getFolderSize(currentDir))
+    }, [dirStack.current.length])
     
     function findForeignFolders() {
       const foreignFolders = {}
@@ -264,52 +271,218 @@ function FilesBrowser(prps) {
 
     function formView(isPartition) {
       console.log("partigion", isPartition)
+      const formType = isPartition ? " Partition" : " Folder"
+      //isPartition ? "Create A Partition" : "Create A Folder"
       //https://medium.com/@everdimension/how-to-handle-forms-with-just-react-ac066c48bd4f
       //https://css-tricks.com/html5-meter-element/
-      return (
-        <div className="folderForm">
-          <span><h4>{isPartition ? "Create A Partition" : "Create A Folder"} </h4></span>
-          <form id="createFolder" onSubmit={handleCreateFolderFormSubmit}>
-            <label for="folderName"> Name your new {isPartition ? "Partition" : "Folder"} </label>
-            <input onChange={() => {console.log("edit")}} type="text" name="folderName" defaultValue="MyFolder"/><br></br>
 
-            <label for="isSmart"> Select The Drives To Connect </label>
-            <label for="driveSelect-google"> Google </label>
-            <input type="checkbox"  id="driveSelect-google" value="google" name="isSmart"/>
-            <meter></meter>
-            <label for="driveSelect-dropbox"> Dropbox </label>
-            <input type="checkbox"  id="driveSelect-dropbox" value="dropbox" name="isSmart"/>
-            <meter></meter>
-          
-            {isPartition ? partitionForm() : ""}
+      return(
+        <div class="modal fade" id="createFolderModal" tabindex="-1" aria-labelledby="createFolderModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">Create a New {formType}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div className="container" >
 
-            <button type="submit" ></button>
+        
+
+        <form id="createFolder" onSubmit={(e) => handleCreateFolderFormSubmit(e)}>
+
+                {folderFormBody(formType)}
+
+                {isPartition ? partitionFormBody() : ""}            
+
+                
           </form>
+
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="modalClose" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary"  form="createFolder"  >Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+      )
+
+      return (
+        
+        
+        <div className="folderForm container">
+
+          <div class="row">
+
+              <div class="col-6">Left</div>
+              <div class="col-6">Right</div>
+          </div>
+          
+            <span><h4>{"Create a New"+formType} </h4></span>
+            <form id="createFolder" onSubmit={handleCreateFolderFormSubmit}>
+
+                {folderFormBody(formType)}
+
+                {isPartition ? partitionFormBody() : ""}            
+
+                <button onClick={() => setDisplayForm(false)}>Create</button>
+                <button onClick={() => setDisplayForm(false)}>Cancel</button>
+            </form>
         </div>
       )
 
-      function partitionForm() {
-        //https://stackoverflow.com/questions/28438485/change-form-contents-dynamically
+      function folderFormBody(toCreateStr) {
         return (
           <React.Fragment>
-            <label for="mode"> Select The RAID mode of this partition </label>
-          
-            <select name="mode" id="mode-Form"> 
-              <option value="0" disabled="true">Span</option>
-              <option value="1">Mirror</option>
-              <option value="2">Stripe</option>
-              <option value="3">Stipe-Mirror</option>
-            </select>
+              <div class="row pt-3">
+                <div class="col-5 pt-1" >
+                <label for={"Name Your New"+toCreateStr} class="form-label">{"Name Your "+toCreateStr+":"}</label>
+                </div>
+                <div class="col-7" >
+                <input type="text" class="form-control" id="folderName" placeholder={"My"+toCreateStr}/>
+                </div>
+              </div>
+              
 
-            <label for="isSmart"> Enable Smart Uploads on this partition </label>
-            <label for="isSmart-enabled"> Enabled </label>
-            <input type="radio"  id="isSmart-enabled" value="1" name="isSmart"/>
-            <label for="isSmart-disabled"> Disabled </label>
-            <input type="radio"  id="isSmart-disabled" value="0" name="isSmart"/>
+          </React.Fragment>  
+        )
+      }
+
+      function partitionFormBody() {
+        
+        return (
+          <React.Fragment>
+
+              <div className="row pt-3"> 
+                <div className="col-10"><div className="">Allocate Space To Your Parition (MB): </div></div>
+              </div>
+
+              <div className="row">
+
+              <div className="col-3 offset-1 ">              
+                <label class="form-check-label" for="flexCheckDefault">
+                  Google Drive 
+                </label>   
+              </div>
+              <div className="col-3 ">                
+                <input onChange={() => updateAllocation({})} style={{width:"100%"}} class="form-number-input" type="number" min="0" max="100" step="10" placeholder="0" id="flexCheckGoogle"/>
+              </div>
+              <div className="col-5 pt-1">
+                <div class="progress" style={{width:"100%"}} id="allocationBarGoogle">
+                  <div class="progress-bar" id="allocationBar-Google" role="progressbar" style={{width:"20%", backgroundColor:"yellow"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
+                  <div class="progress-bar progress-bar-striped" id="allocationBar-Google-Input" role="progressbar" style={{width:"20%", backgroundColor:"grey"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
+                  
+                </div>  
+              </div>
+
+              </div>
+
+              <div className="row">
+
+              <div className="col-3 offset-1">              
+                <label class="form-check-label" for="flexCheckDefault">
+                  Dropbox 
+                </label>   
+              </div>
+              <div className="col-3 ">
+                <input onChange={() => updateAllocation({})} style={{width:"100%"}} class="form-number-input" type="number" min="0" max="10000" step="10" placeholder="0" id="flexCheckDropbox"/>
+              </div>              
+              <div className="col-5 pt-1">
+                <div class="progress" style={{width:"100%"}} id="allocationBarDropbox">
+                  <div class="progress-bar" id="allocationBar-Dropbox" role="progressbar" style={{width:"20%", backgroundColor:"blue"}} aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+                  <div class="progress-bar progress-bar-striped" id="allocationBar-Dropbox-Input" role="progressbar" style={{width:"20%", backgroundColor:"grey"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
+                  
+                </div>  
+              </div>
+
+              </div>
+              {/*
+              <div className="row">
+
+              <div className="col-10 offset-1 pt-3">              
+                Allocation After Creation   
+              </div>            
+
+              </div>
+
+              <div className="row pt-2">
+
+              <div className="col-12 offset-3">
+              <div class="progress" id="allocationBar">
+                <div class="progress-bar" id="allocaltionBar-Google" role="progressbar" style={{width:"20%", backgroundColor:"yellow"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
+                <div class="progress-bar" id="allocationBar-Dropbox" role="progressbar" style={{width:"20%", backgroundColor:"blue"}} aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>
+                <div class="progress-bar" id="allocaltionBar-GoogleAddition" role="progressbar" style={{width:"20%", backgroundColor:"red"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
+                <div class="progress-bar" id="allocationBar-DropboxAddition" role="progressbar" style={{width:"20%", backgroundColor:"green"}} aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>
+                
+              </div>   
+              </div>
+
+              <div className="col-0 ">
+          
+              </div>
+
+              </div>
+              */}
+              
+              <div className="row pt-4">
+
+                <div className="col-12">Configure Partition Type:</div>
+
+              </div>
+
+              <div className="row pt-2">
+                
+                <div className="col-7">
+
+                <select class="form-select" aria-label="Default select example">
+                <option selected>Partition RAID Type</option>
+                <option value="1">Span</option>
+                <option value="2">Mirror</option>
+                <option value="3">Stripe</option>
+                <option value="4">Mirror-Stripe</option>
+                <option value="5" disabled="true" >Parity (Not Yet Supported)</option>
+              </select>
+
+                </div>
+
+                <div className="col-5">
+
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="" id="flexCheckSmart"/>
+                  <label class="form-check-label" for="flexCheckDefault">
+                    Enable Smarter Uploads
+                  </label>
+                </div>
+
+                </div>
+
+
+              </div>
+
+              
+
+              
+
+              
           </React.Fragment>  
         )
       }
       
+    }
+
+    function updateAllocation({googleTotal=1000, dropboxTotal=1000}) {     
+      const inputs = document.getElementsByClassName("form-number-input")
+
+      const gglAlloc = inputs[0].value || 0
+      const dbxAlloc = inputs[1].value || 0
+
+      console.log("Width", Math.floor((gglAlloc/googleTotal)*100))
+
+      document.getElementById("allocationBar-Google-Input").style.width = Math.floor((gglAlloc/googleTotal)*100)+"%"
+      document.getElementById("allocationBar-Dropbox-Input").style.width = Math.floor((dbxAlloc/dropboxTotal)*100)+"%"
+
     }
 
   function HomeView({content, dirStack}) {
@@ -412,19 +585,30 @@ function FilesBrowser(prps) {
 
   function handleCreateFolderFormSubmit(event) {
     event.preventDefault()
-    console.log(event)
+    console.log("Form Submitted:", event)
+    const [folderName, GGLAlloc, DBXAlloc, mode, isSmart]= event.target
 
+    document.getElementById("modalClose").click()
+
+    console.log("Creating Folder with name", folderName.value)
+    
     const dir = dirStack.current
-    const target = fileTree.current[dir[dir.length - 1][1]].origin
-    const name = event.name
-
+    const target = fileTree.current[dir[dir.length - 1][0]].mergedIDs
+    
     const requestBody = {
         params: {        
           targetDrive: target || "google",
           targetPath: dir,                  
         },
         data: {
-          name
+          name:folderName.value,
+          isPartition: dir.length === 1,
+          allocation:{
+            "google":{limit:GGLAlloc?.value, usage:0},
+            "dropbox":{limit:DBXAlloc?.value, usage:0}
+          },
+          mode:mode?.value,
+          isSmart:isSmart?.value
         }
       }
 
@@ -442,33 +626,41 @@ function FilesBrowser(prps) {
 
     for(const item of Object.values(toDisplay)) {
       const newItem = JSON.parse(JSON.stringify(item))
-      newItem.originSet = [item.origin]
-      if(item.name.includes("__") && item.isFolder) {        
+      // newItem.originSet = [item.origin]
+
+      if(item.isPartitionFolder) {
+        //slice off "p_"
+        newItem.displayName = item.name.slice(2, item.name.length)
+      }
+
+
+      if(item.name.includes("__") && item.isFolder) {   
+          //hide foreign folders   
         if(item.name.includes("foreign")) {          
           newItem.isHidden = true
         }
-        else {
-          newItem.name = item.name.slice(2, item.name.length) //slicing off "__" identifier
-          //check if item appears in the foreign folder set, to accumulate "origins"
-          for(const [owner, folder] of Object.entries(foreigns)) {
+        // else {
+        //   newItem.name = item.name.slice(2, item.name.length) //slicing off "__" identifier
+        //   //check if item appears in the foreign folder set, to accumulate "origins"
+        //   for(const [owner, folder] of Object.entries(foreigns)) {
             
-            const foreignParts = allFiles[folder[1]].children
-            for(const {name} of Object.values(foreignParts)) {
-              const trimName = name.slice(2, name.length)
-              if(item.name.includes(trimName)) newItem.originSet.push(owner) 
-            }
+        //     const foreignParts = allFiles[folder[1]].children
+        //     for(const {name} of Object.values(foreignParts)) {
+        //       const trimName = name.slice(2, name.length)
+        //       if(item.name.includes(trimName)) newItem.originSet.push(owner) 
+        //     }
 
             
             
                        
-          }
-        }
+        //   }
+        // }
         //Found a parts folder
         // want to convert to a file representation
         newItem.isFolder = false
       }
 
-      newDisplay[item.id] = newItem
+      newDisplay[item.name] = newItem
     }
     console.log("generatedDisplay", newDisplay)
     return newDisplay
@@ -523,6 +715,17 @@ function FilesBrowser(prps) {
 		console.log("containingDir", containingDir)
       //What is config: dictates upload type - how?
       // isSmart, then raid mode - 
+      // let config = {
+      //   mode:0;
+      //   connectedDrives:["google"]
+      // }
+
+      if(fullWorkingDir.length > 1) {
+        //am in a partition
+
+      }
+
+      const paritionID = fileTree[fullWorkingDir[1][1]].partition
 
       const requestBody = {
         params: {
@@ -643,18 +846,17 @@ function FilesBrowser(prps) {
       ipcRenderer.on("FileBrowser-Render-Response", (evnt, response) => {
         
         fileTree.current = JSON.parse(response)
-        
-
+        console.log("Refreshed Data:", fileTree.current)
+        //console.log("mix partition size:",getFolderSize("p_mix partition"))
         //console.log("byId", fileTree.current)
         //console.log("byPath", fileTreeByPath.current)
         
         // Setting based on list file response
-        let currentDirId = (dirStack.current[dirStack.current.length - 1])[1]
+        let currentDirId = (dirStack.current[dirStack.current.length - 1])[0]
         
-        //console.log("tree", fileTree.current, "displaying ", currentDirId)
-        //onsole.log("ToDisplay", fileTree.current[currentDirId])
-        //console.log("AllocationTable:", fileTree.current)
-       console.log("displye", response)
+        const {google, dropbox} = getFolderSize(currentDirId)
+        setCurrentFolderSize([google, dropbox])
+        //setCurrentFolderSize(getFolderSize(currentDirId))
         setDisplayedFiles(fileTree.current[currentDirId].children)        
         
       })
@@ -683,7 +885,7 @@ function FilesBrowser(prps) {
             break;
           
           }
-          let dIsFound = 0
+         
 
         while (dnext !== d[d.length - 1]) {
           d.pop()
@@ -714,13 +916,62 @@ function FilesBrowser(prps) {
       dirStack.current = d      
 
       //setting based on file tree navigation
-      console.log("tree", fileTree.current)
-      setDisplayedFiles(fileTree.current[dId].children)
+      console.log("tree, nav", fileTree.current, dstr)
+      
+      setDisplayedFiles( fileTree.current[dstr] && fileTree.current[dstr].children)
 
     }
 
     function findItem({dStr, dId}) {}
       // Search - string/ id
+
+      function getFolderSize(name) {
+        console.log("sizing folder:", name);
+        const allFolders = fileTree.current;
+        const toCalculateFolder = allFolders[name];
+        if(!toCalculateFolder) return {google:0, dropbox:0}   
+        let totalSize = {
+          ...Object.keys(toCalculateFolder.mergedIDs).reduce((acc, el) => {
+            acc[el] = 0;
+            return acc;
+          }, {}),
+        };
+        totalSize["google"] = 0; totalSize["dropbox"] =0
+        totalSize = _getFolderSize(toCalculateFolder, totalSize);
+        return totalSize;
+        function _getFolderSize(folder, totalSize) {
+          for (const child of Object.values(folder.children)) {
+            console.log("childname", child.name);
+            if (child.isFolder) {
+              //recurse
+              const toCalculateFolder = allFolders[child.name];
+              const { google, dropbox } = _getFolderSize(
+                toCalculateFolder,
+                totalSize
+              );
+              // console.log("folder" , child.name, "ggl dbx", google, dropbox)
+              // if(google) {
+              //   totalSize["google"] += google || 0
+              // }
+              // if(dropbox) {
+              //   totalSize["dropbox"] += dropbox || 0
+              // }
+            } else {
+              console.log("file.name", child.name);
+              // a non folder can only exist in merged form if mirrored
+              // still must consider it takes up space "twice"
+              for (const id of Object.keys(child.mergedIDs)) {
+                totalSize[id] += parseInt(child.size) || 0;
+              }
+            }
+            console.log("size", totalSize["google"], totalSize["dropbox"]);
+          }
+          return totalSize;
+        }
+      }
+
+    
+
 
     }
 

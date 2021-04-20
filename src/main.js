@@ -7,8 +7,10 @@ const { handleRequest } = require("./requestHandler");
 function createWindow() {
   // Create the browser window.
   const win = new BrowserWindow({
-    width: 800,
+    width: 900,
     height: 600,
+    minWidth: 820,
+    minHeight: 500,
     title: "cloudLinker",
     frame: true,
     webPreferences: {

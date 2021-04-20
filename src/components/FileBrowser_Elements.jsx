@@ -27,7 +27,7 @@ export function FilesBrowser_PWD(props) {
             
             dStack.map(d => {
                 //console.log("Directory",d[0])
-                return <a key={d[1]} href="#" onMouseOver={() => console.log("hover")} onClick={() => props.func1("back", d)}> <span id="dirTxt"> {d[0]}/ </span>  </a>
+                return <a key={d[1]} href="#" onMouseOver={() => console.log("hover")} onClick={() => props.func1("back", d)}> <span id="dirTxt"> {d[0].includes("p_") ? d[0].slice(2, d[0].length) : d[0]}/ </span>  </a>
             })
             }
             {/* <span id="dirTxt">{dStack[dStack.length - 1][0]}</span> */}
@@ -55,15 +55,15 @@ export function FilesBrowser_Folders(props) {
             return(
                 
                 <div    onClick={
-                            () => folderFuncs.onClickChild("fwd", [folder.name, folder.id])} 
+                            () => folderFuncs.onClickChild("fwd", [folder.name, folder.mergedIDs])} 
                         className="folder" key={folder.id} >
                             {originDisplay(folder)}            
-                    <span>{folder.name} </span>
+                    <span>{folder.displayName || folder.name} </span>
                 </div>
         
             )
         })}
-        <div className="folder" onClick={() => folderFuncs.onCreateFolder("NEW")}>
+        <div className="folder" data-bs-toggle="modal" data-bs-target="#createFolderModal" onClick={() => folderFuncs.onCreateFolder("NEW")}>
         <span>Create New {isPartitionLevel ? "Partition" : "Folder"} </span>
         </div>
         </div>
@@ -169,51 +169,19 @@ function toggleClass(el, className) {
     el.classList.toggle(className) 
 };
 
-function originDisplay({origin="other", originSet}) {
-    
-
-    if(originSet && originSet.length !== 0) {
-        originSet.sort()
-        console.log("OS", originSet)
-        return (
-            <div className="originsDisplay">
+function originDisplay({mergedIDs}) {
+    const originSet = Object.keys(mergedIDs).sort()
+    return(
+        <div className="originsDisplay">
                 {originSet.map( originID => {
                     return (
                     <span className="dot" style={{ backgroundColor:drivesStyle[originID].color }}> </span>
                     )
                 })}
             </div>
-        )
-    }
-
-    const c = drivesStyle[origin].color
-    // return a dot per location,
-    // styled to above colour
-    return (
-        <div className="originsDisplay">
-            
-              {
-                
-                <span className="dot" style={{backgroundColor:c}} ></span>
-
-              }  
-            
-        </div>
-
-    )
-
-}
-
-function buttonBox (props) {
-    return (
-
-        <div>
-            <span></span>
-            <input type="checkbox" />
-        </div>
-
     )
 }
+
 
 //Ui versions to be called immediatly after prop version is called
 // (act before the server acknowledges)
