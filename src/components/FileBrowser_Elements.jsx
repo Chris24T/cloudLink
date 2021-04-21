@@ -75,7 +75,7 @@ export function FilesBrowser_Files(props) {
     const 
     files = props.fi,
     fileFuncs = props.fifunc
-    console.log("Rendering Files HERE", files)
+    //console.log("Rendering Files HERE", files)
 
     //if (files.length === 0) return <span> No Files</span>
     return (

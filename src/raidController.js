@@ -88,10 +88,9 @@ class raidController {
       );
 
       //console.log("Parition Name", name);
-
+      paritionInfoDB.insert({ name: name, mode, isSmart, targets });
       callClients((clientId, client) => {
         client.createPartitionFolder(name);
-        paritionInfoDB.insert({ name: name, mode, isSmart, targets });
       }, Object.keys(targets));
     } else {
       //Standard Folder Creation
@@ -105,7 +104,20 @@ class raidController {
 
   deleteFiles() {}
 
-  getCapacities() {}
+  getSpaceUsage() {
+    let usage = [];
+    callClients((clientID, client) => {
+      usage.push(client.getSpaceUsage());
+    });
+
+    return Promise.all(usage).then((usage) => {
+      console.log("usage", usage);
+      return usage.reduce((acc, el) => {
+        acc[el.origin] = el;
+        return acc;
+      }, {});
+    });
+  }
 
   listFiles() {
     let clientResponses = [];
@@ -122,8 +134,6 @@ class raidController {
     });
 
     return Promise.all(clientResponses).then((fileLists) => {
-      //console.log("Drobox", fileLists[0].entries);
-      //console.log("Google", fileLists[1].entries);
       const formattedList = formatLists(fileLists);
       return formattedList;
     });
@@ -148,11 +158,6 @@ raidController.prototype.getCapacities = function () {
 
   return res;
 };
-
-function applyUserConfig_Upload_drivePreference(obj) {
-  //maybe make a userconfig object - applies filters, manipulations etc
-  return obj;
-}
 
 async function formatLists(lists) {
   const formatOptions = {
@@ -249,7 +254,8 @@ async function formatLists(lists) {
       delete parentList["home"].children[child.name];
     }
   }
-  console.log("Built List, sending to front", parentList);
+  //console.log("Built List, sending to front", parentList);
+
   return parentList;
 
   function _formatDropbox(list, origin) {

@@ -49,7 +49,7 @@ class dropboxAuth {
     return DROPBOX_ACESSTOKEN;
   }
 
-  listFiles(listPath) {
+  async listFiles(listPath) {
     const resp = this.authorize((client) => {
       return _listFiles(client, listPath);
     });
@@ -135,6 +135,21 @@ class dropboxAuth {
 
   downloadFiles() {
     function _downloadFile() {}
+  }
+
+  getSpaceUsage() {
+    const resp = this.authorize((client) => {
+      return client.usersGetSpaceUsage();
+    });
+
+    return resp.then((val) => {
+      console.log("dbx val", val);
+      return {
+        origin: "dropbox",
+        allocated: val.result.allocation.allocated,
+        used: val.result.used,
+      };
+    });
   }
 
   createPartitionFolder(name) {

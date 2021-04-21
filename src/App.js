@@ -22,6 +22,7 @@ function App() {
   const allFiles = useRef({});
   const [displayFiles, setDisplayFiles] = useState({});
   const [currentFolderSize, setCurrentFolderSize] = useState([]);
+  const usageStatistics = useRef({});
 
   useEffect(() => {
     return () => {};
@@ -42,6 +43,31 @@ function App() {
     ipcRenderer.send("FileBrowser-Render-Request", [message, FILTERS]);
   }
 
+  function convertUnits(valueInBytes) {
+    let usedUnit = "B";
+
+    if (valueInBytes > 1000) {
+      valueInBytes = valueInBytes / 1024;
+      usedUnit = "KB";
+    }
+    if (valueInBytes > 1000) {
+      valueInBytes = valueInBytes / 1024;
+      usedUnit = "MB";
+    }
+    if (valueInBytes > 1000) {
+      valueInBytes = valueInBytes / 1024;
+      usedUnit = "GB";
+    }
+    valueInBytes = round(valueInBytes, usedUnit);
+
+    return (valueInBytes += usedUnit);
+
+    function round(value, unit) {
+      if (unit === "B") return value;
+      return value.toFixed(2);
+    }
+  }
+
   return (
     <div>
       <browserContentContext.Provider
@@ -52,6 +78,8 @@ function App() {
           setDisplayFiles,
           currentFolderSize,
           setCurrentFolderSize,
+          usageStatistics,
+          convertUnits,
         }}
       >
         <Router>

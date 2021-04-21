@@ -79,10 +79,24 @@ class googleAuth {
   }
 
   //TODO
-  getUsage() {}
+  getSpaceUsage() {
+    const resp = this.authorize((client) => {
+      return client.about.get({
+        fields: "storageQuota",
+      });
+    });
+
+    return resp.then((val) => {
+      return {
+        origin: "google",
+        allocated: parseInt(val.data.storageQuota.limit),
+        used: parseInt(val.data.storageQuota.usage),
+      };
+    });
+  }
 
   // name is not "Home" that is an app naming convetion, am actulally looking for "root" - or equivalent
-  listFiles(listPath = [["", ROOTID]]) {
+  async listFiles(listPath = [["", ROOTID]]) {
     //id of the containing folder being listed
     const toList = listPath[listPath.length - 1][0];
 

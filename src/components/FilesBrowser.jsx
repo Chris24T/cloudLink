@@ -25,7 +25,7 @@ const CHANNEL_NAME_RES = 'FileBrowser-Render-Response';
 
 function FilesBrowser(prps) {
 
-    const {dirStack, setCurrentFolderSize, allFiles:fileTree, displayFiles:displayedFiles, setDisplayFiles, activePartition=true} = useContext(browserContentContext)
+    const {dirStack, convertUnits, setCurrentFolderSize, currentFolderSize,usageStatistics:usage, allFiles:fileTree, displayFiles:displayedFiles, setDisplayFiles, activePartition=true} = useContext(browserContentContext)
     const [displayMode, setDisplayMode] = useState("simple")
     const [displayForm, setDisplayForm] = useState(true)
 
@@ -55,10 +55,37 @@ function FilesBrowser(prps) {
     
     },[])
 
+    // useEffect( () => {
+    //   const currentDir = dirStack.current[dirStack.current.length-1][0]
+    //   console.log("dir", currentDir)
+    //   setCurrentFolderSize(getFolderSize(currentDir))
+    // }, [true])
+
     useEffect( () => {
-      const currentDir = dirStack.current[dirStack.current.length-1][0]
-      console.log("dir", currentDir)
-      setCurrentFolderSize(getFolderSize(currentDir))
+      console.log("directory change")
+      const dStack = dirStack.current
+      const currentDirName = dirStack.current[dirStack.current.length - 1][0]
+      //const {google, dropbox} = getFolderSize(currentDirName)
+      let usage = []
+
+      if(dStack.length > 1) {
+        console.log("dstacj", dStack)
+        const partitionName = dStack[1][0]
+        console.log("parition", fileTree.current[partitionName])
+        const partitionLimits = fileTree.current[partitionName].partitionConfig.fulfillmentValue[0].targets
+        const capacity = getFolderSize(partitionName)
+        usage = [[partitionLimits["google"].limit, capacity.google], [partitionLimits["dropbox"].limit, capacity.dropbox]]
+        
+      } else {
+        const {google, dropbox} = getFolderSize("home")
+        usage = [[1000, google],[1000, dropbox]]
+      }
+
+      
+      
+      console.log("usage", usage)
+      //setCurrentFolderSize([google, dropbox])
+      setCurrentFolderSize(usage)
     }, [dirStack.current.length])
     
     function findForeignFolders() {
@@ -270,7 +297,7 @@ function FilesBrowser(prps) {
     }
 
     function formView(isPartition) {
-      console.log("partigion", isPartition)
+      //console.log("partigion", isPartition)
       const formType = isPartition ? " Partition" : " Folder"
       //isPartition ? "Create A Partition" : "Create A Folder"
       //https://medium.com/@everdimension/how-to-handle-forms-with-just-react-ac066c48bd4f
@@ -352,11 +379,30 @@ function FilesBrowser(prps) {
 
       function partitionFormBody() {
         
+        const driveusage = usage.current
+        
+        const {googleReserved, dropboxReserved} = getReserved()
+        const googleWidth = (Math.floor((100*(googleReserved||1)/driveusage?.google?.allocated||100))||1)+"%"
+        const dropboxWidth =( Math.floor(( 100*(dropboxReserved||1)/driveusage?.dropbox?.allocated||100)) || 1)+"%"
+
+        const googleUsed =( driveusage?.google?.used||1)
+        const dropboxUsed = (driveusage?.dropbox?.used)
+        const googleAlloc = (driveusage?.google?.allocated||100)
+        const dropboxAlloc = (driveusage?.dropbox?.allocated||100)
+
+        const googleReservedFree = convertUnits(googleAlloc - googleReserved)
+        const dropboxReservedFree = convertUnits(dropboxAlloc - dropboxReserved)
+
+        // usage here should be sum of all limits - am reserving space
+
+        const googleRemaining = googleAlloc - googleUsed
+        const dropboxRemaining = dropboxAlloc - dropboxUsed
+        
         return (
           <React.Fragment>
 
               <div className="row pt-3"> 
-                <div className="col-10"><div className="">Allocate Space To Your Parition (MB): </div></div>
+                <div className="col-10"><div className="">Reserve Space For Your Parition (MB): </div></div>
               </div>
 
               <div className="row">
@@ -367,12 +413,13 @@ function FilesBrowser(prps) {
                 </label>   
               </div>
               <div className="col-3 ">                
-                <input onChange={() => updateAllocation({})} style={{width:"100%"}} class="form-number-input" type="number" min="0" max="100" step="10" placeholder="0" id="flexCheckGoogle"/>
+                <input onChange={() => updateAllocation({googleRemaining, dropboxRemaining})} style={{width:"100%"}} class="form-number-input" type="number" min="0" max={(googleRemaining/(1024*1024))} step="10" placeholder="0" id="flexCheckGoogle"/>
               </div>
               <div className="col-5 pt-1">
-                <div class="progress" style={{width:"100%"}} id="allocationBarGoogle">
-                  <div class="progress-bar" id="allocationBar-Google" role="progressbar" style={{width:"20%", backgroundColor:"yellow"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
-                  <div class="progress-bar progress-bar-striped" id="allocationBar-Google-Input" role="progressbar" style={{width:"20%", backgroundColor:"grey"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
+                <span style={{position:"absolute",top:"20px", fontSize:"small"}}>Free: {googleReservedFree}, Preallocated {convertUnits(googleReserved)}</span>
+                <div class="progress" style={{width:"100%", marginTop:"5px"}} id="allocationBarGoogle">
+                  <div class="progress-bar progress-bar-striped" id="allocationBar-Google" role="progressbar" style={{width:googleWidth, backgroundColor:"grey",}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
+                  <div class="progress-bar " id="allocationBar-Google-Input" role="progressbar" style={{width:"0%", backgroundColor:"yellow", borderRight:"1px solid black"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
                   
                 </div>  
               </div>
@@ -383,16 +430,17 @@ function FilesBrowser(prps) {
 
               <div className="col-3 offset-1">              
                 <label class="form-check-label" for="flexCheckDefault">
-                  Dropbox 
+                  Dropbox
                 </label>   
               </div>
               <div className="col-3 ">
-                <input onChange={() => updateAllocation({})} style={{width:"100%"}} class="form-number-input" type="number" min="0" max="10000" step="10" placeholder="0" id="flexCheckDropbox"/>
+                <input onChange={() => updateAllocation({googleRemaining, dropboxRemaining})} style={{width:"100%"}} class="form-number-input" type="number" min="0" max={(dropboxRemaining/(1024*1024))} step="10" placeholder="0" id="flexCheckDropbox"/>
               </div>              
               <div className="col-5 pt-1">
-                <div class="progress" style={{width:"100%"}} id="allocationBarDropbox">
-                  <div class="progress-bar" id="allocationBar-Dropbox" role="progressbar" style={{width:"20%", backgroundColor:"blue"}} aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
-                  <div class="progress-bar progress-bar-striped" id="allocationBar-Dropbox-Input" role="progressbar" style={{width:"20%", backgroundColor:"grey"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
+              <span style={{position:"absolute",top:"20px", fontSize:"small"}}>Free: {dropboxReservedFree}, Preallocated {convertUnits(dropboxReserved)} </span>
+                <div class="progress" style={{width:"100%", marginTop:"5px"}} id="allocationBarDropbox">
+                  <div class="progress-bar progress-bar-striped" id="allocationBar-Dropbox" role="progressbar" style={{width:dropboxWidth, backgroundColor:"grey",}} aria-valuenow="20" aria-valuemin="0" aria-valuemax="100"></div>
+                  <div class="progress-bar " id="allocationBar-Dropbox-Input" role="progressbar" style={{width:"0%", backgroundColor:"blue", borderRight:"1px solid black"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
                   
                 </div>  
               </div>
@@ -472,13 +520,28 @@ function FilesBrowser(prps) {
       
     }
 
-    function updateAllocation({googleTotal=1000, dropboxTotal=1000}) {     
+    function getReserved() {
+      //sum across limits of every partition
+      let googleReserved = 0,
+      dropboxReserved = 0
+
+      for (const folder of Object.values(fileTree.current)) {
+        if(folder.isPartitionFolder) {
+          console.log("fold", folder)
+          googleReserved += parseInt(folder.partitionConfig?.fulfillmentValue[0].targets?.google?.limit || 0)
+          dropboxReserved += parseInt(folder.partitionConfig?.fulfillmentValue[0].targets?.dropbox?.limit || 0)
+        }
+      }
+      return {googleReserved, dropboxReserved}
+    }
+
+    function updateAllocation({googleRemaining:googleTotal=1000, dropboxRemaining:dropboxTotal=1000}) {     
       const inputs = document.getElementsByClassName("form-number-input")
+      // console.log("googs", googleTotal)
+      const gglAlloc = (inputs[0].value * 1024 * 1024) || 0
+      const dbxAlloc = (inputs[1].value * 1024 * 1024)|| 0
 
-      const gglAlloc = inputs[0].value || 0
-      const dbxAlloc = inputs[1].value || 0
-
-      console.log("Width", Math.floor((gglAlloc/googleTotal)*100))
+      // console.log("Width", Math.floor((gglAlloc/googleTotal)*100))
 
       document.getElementById("allocationBar-Google-Input").style.width = Math.floor((gglAlloc/googleTotal)*100)+"%"
       document.getElementById("allocationBar-Dropbox-Input").style.width = Math.floor((dbxAlloc/dropboxTotal)*100)+"%"
@@ -486,7 +549,7 @@ function FilesBrowser(prps) {
     }
 
   function HomeView({content, dirStack}) {
-    console.log("Rendering Content:", content)
+    //console.log("Rendering Content:", content)
     const {getRootProps, getInputProps, isDragActive} = useDropzone({onDrop})
 
     // if(dirStack.current.length === 1) return (
@@ -516,7 +579,7 @@ function FilesBrowser(prps) {
             
             (() => {
               let folders = [], files = []
-              console.log("Rendering", Object.values(content).length, "files")
+              //console.log("Rendering", Object.values(content).length, "files")
               
               Object.values(content).forEach( file => {        
                 //if (file.head) file = file.head
@@ -662,7 +725,7 @@ function FilesBrowser(prps) {
 
       newDisplay[item.name] = newItem
     }
-    console.log("generatedDisplay", newDisplay)
+    //console.log("generatedDisplay", newDisplay)
     return newDisplay
   }
 
@@ -843,10 +906,20 @@ function FilesBrowser(prps) {
       const FILTERS = {}
     
       ipcRenderer.send(CHANNEL_NAME_REQ, [message, FILTERS])
+
+      ipcRenderer.send("FileBrowser-Usage-Request", [{requestType:"getUsage-request", requestBody:{params:{}, data:{}}}, {}])
+
+      ipcRenderer.on("FileBrowser-Usage-Response", (event, response) => {
+        response = JSON.parse(response)
+        console.log("usage res[psme ", response)
+        usage.current = response
+      })
+
+
       ipcRenderer.on("FileBrowser-Render-Response", (evnt, response) => {
         
         fileTree.current = JSON.parse(response)
-        console.log("Refreshed Data:", fileTree.current)
+        //console.log("Refreshed Data:", fileTree.current)
         //console.log("mix partition size:",getFolderSize("p_mix partition"))
         //console.log("byId", fileTree.current)
         //console.log("byPath", fileTreeByPath.current)
@@ -926,7 +999,7 @@ function FilesBrowser(prps) {
       // Search - string/ id
 
       function getFolderSize(name) {
-        console.log("sizing folder:", name);
+        //console.log("sizing folder:", name);
         const allFolders = fileTree.current;
         const toCalculateFolder = allFolders[name];
         if(!toCalculateFolder) return {google:0, dropbox:0}   
@@ -941,7 +1014,7 @@ function FilesBrowser(prps) {
         return totalSize;
         function _getFolderSize(folder, totalSize) {
           for (const child of Object.values(folder.children)) {
-            console.log("childname", child.name);
+            //console.log("childname", child.name);
             if (child.isFolder) {
               //recurse
               const toCalculateFolder = allFolders[child.name];
@@ -957,14 +1030,14 @@ function FilesBrowser(prps) {
               //   totalSize["dropbox"] += dropbox || 0
               // }
             } else {
-              console.log("file.name", child.name);
+              //console.log("file.name", child.name);
               // a non folder can only exist in merged form if mirrored
               // still must consider it takes up space "twice"
               for (const id of Object.keys(child.mergedIDs)) {
                 totalSize[id] += parseInt(child.size) || 0;
               }
             }
-            console.log("size", totalSize["google"], totalSize["dropbox"]);
+            //console.log("size", totalSize["google"], totalSize["dropbox"]);
           }
           return totalSize;
         }

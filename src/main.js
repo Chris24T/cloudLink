@@ -55,6 +55,12 @@ const init = () => {
     return e.reply("FileBrowser-Render-Response", JSON.stringify(response));
   });
 
+  ipcMain.on("FileBrowser-Usage-Request", async (e, messageContent) => {
+    const response = await handleRequest(messageContent);
+    console.log("got reqest");
+    return e.reply("FileBrowser-Usage-Response", JSON.stringify(response));
+  });
+
   ipcMain.on("shutdown", async (e, messageContent) => {
     app.exit();
   });
