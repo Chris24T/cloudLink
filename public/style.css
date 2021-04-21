@@ -377,6 +377,16 @@ meter {
   transition: 0.25s;
 }
 
+.dropdownButton {
+  width: 100%;
+  border-style: none;
+}
+
+.dropdownButton:hover {
+  background-color: #636e72;
+  transition: all 0.5s;
+}
+
 #capBox.expand {
   height: 210px;
   background-color: #636e72;

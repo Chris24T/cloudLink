@@ -2,6 +2,7 @@ const fs = require("fs");
 const readline = require("readline");
 
 const { google } = require("googleapis");
+const { file } = require("googleapis/build/src/apis/file");
 
 const CLIENT_ID = process.env.GOOGLE_AUTH_CLIENT_ID,
   CLIENT_SECRET = process.env.GOOGLE_AUTH_CLIENT_SECRET,
@@ -128,72 +129,45 @@ class googleAuth {
   }
 
   deleteFiles(files) {
-    for (const file of files) {
-      console.log(
-        "GGL:" + file.parts.length,
-        "total delete request for this file"
-      );
-      for (const part of Object.values(file.parts)) {
-        console.log("deleting Id", part.id);
-        this.authorize((client) => {
-          client.files.delete({ fileId: part.id });
-        });
-      }
+    if (files.length === 0) return;
+    console.log("attempting to delte", files);
+    this.authorize((client) => {
+      files.forEach((file) => {
+        _deleteFile(client, file);
+      });
+    });
+
+    function _deleteFile(client, [name, id]) {
+      const resp = client.files.delete({ fileId: id[0] });
     }
   }
 
   // recieve from front: {conifg, files}
   // upload expects: upload(files[], config={isSmart, mode, target->e.g. google})
   uploadFiles(files, targetInfo, mode) {
-    const { uploadType, isSmart } = mode;
+    const { uploadType } = mode;
 
     let fileCounter = 1,
       partCounter = 1;
 
     this.authorize((client) => {
-      files.forEach(async ({ fileInfo, parts }) => {
+      files.forEach(async ({ file, parts }) => {
+        const { fileInfo, existingFileData } = file;
         console.log(
-          "GGL:" + parts.length,
-          "total upload request for this file"
+          "GGL: ",
+          parts.length,
+          " Upload requests for",
+          fileInfo.name
         );
 
         if (parts.length === 0) return;
-        // case of only one part i.e. entire file
-        // therefore fileName is not going to be a hash
-        if (parts.length === 1 && uploadType !== 2) {
-          console.log("set part name to file name");
+        if (parts.length === 1 && (uploadType !== 2 || uploadType !== 3))
           parts[0].name = fileInfo.name;
-        }
 
-        console.log(
-          "Uploading File",
-          fileInfo.name,
-          "of ",
-          parts.length,
-          " parts | File Position in Queue: [",
-          fileCounter,
-          "/",
-          files.length,
-          "]"
-        );
-        //Check for reupload here
-        // if (file name is in current rendered folder) it is reupload, need to find intermediate parent
-        // else if (is smart or stripe (i.e. chunked)) will need to create intermediate parent folder here
-        fileInfo.parent = await this.findParent(fileInfo, targetInfo, mode);
-        console.log("parent", fileInfo.parent.data);
-        // ! if one part, use fileInfo name, else use part name !
+        fileInfo.parent = await this.findParent(file, targetInfo, mode);
 
         parts.forEach((part) => {
-          console.log(
-            "Initiating Upload | Part Position in Queue [",
-            partCounter,
-            "/",
-            parts.length,
-            "]"
-          );
-
           _uploadFile(client, fileInfo, part, partCounter);
-
           partCounter++;
         });
         fileCounter++;
@@ -240,71 +214,99 @@ class googleAuth {
   // ! when building parts, should get each contaiing folder too
   // reuturn parent id for containing folder of file or file parts
   async findParent(
-    { name, existingFileData },
-    { targetDrive, targetPath, foreignFolders },
+    { fileInfo, existingFileData },
+    { droppedContainer, droppedPath },
     { uploadType, isSmart }
   ) {
-    //name = name.split(".").slice(0, -1).join(".");
     const vID = this.vendor;
     let pID;
-    console.log("existingData", existingFileData);
-    if (targetDrive === vID) {
-      //working in "native"
 
-      if (existingFileData[vID]) {
-        // e.g. root/path...
-        // ->   /f_*name*
-        // if already exists, use same containing folder to upload to - regardless of upload type
-        pID = existingFileData[vID].containingFolder[1];
+    if (parseInt(uploadType) === 0 || parseInt(uploadType) === 1) {
+      //* can upload to conatining dir
+
+      if (droppedPath.length > 1) {
+        return droppedContainer.mergedIDs[vID][0];
       } else {
-        // need to create files part folder
-        // target Path only relevent if drive is target
-        // * should set target automatically based on current dir
-        const installDirID = targetPath[targetPath.length - 1][1];
-        pID = installDirID;
-
-        if (uploadType === 2)
-          pID = (await this.createFolder(installDirID, "__" + name)).data.id;
-
-        // if simple, parent is tos,
-        // else create folder, return taht folder id
-
-        // dont need to create this folder, if simple upload
+        return ROOTID;
       }
     } else {
-      //working in "foreign"
-      let foreign = foreignFolders[vID];
+      //* is striped - need striped folder -> get or create
 
-      if (existingFileData[vID]) {
-        //? foregin must exist here surely - since where else would the containing folder be if it exists?
-
-        // e.g. root/__foreign__/
-        // -> /f_*name*
-
-        //! need to consider if containingFolder can be changed
-        //! e.g. case of changing primary drive (target) where file is stored
-        //! -> native and foreign could switch
-        //* Assuming for now: cannot change the primary drive - means above (blue) query should hold
-        const parentFolder = existingFileData[vID].containingFolder;
-
-        pID = parentFolder[1];
+      //* exisitng data -> existing containing folder
+      //* else create it
+      console.log("GGL: Stripe dropped Container", droppedContainer);
+      console.log("GGL: Stripe Existing Data", existingFileData);
+      if (existingFileData.parts[vID]) {
+        pID = existingFileData.container.mergedIDs[vID][0];
       } else {
-        let foreignID;
-        // if foreign does not exist
-        //create it
-        if (!foreign) {
-          foreignID = (await this.createFolder(ROOTID, "__foreign__")).data.id;
-        } else foreignID = foreign[1];
-        console.log("ggl doreign", foreign);
-
-        //if containing folder does not exist - it shouldnt since no existing copy
-        // create it
-        console.log("creating folder __", name, " in ", foreign);
-        pID = (await this.createFolder(foreignID, "__" + name)).data.id;
+        pID = (
+          await this.createFolder(
+            droppedContainer.mergedIDs[vID][0],
+            "__" + fileInfo.name
+          )
+        ).data.id;
       }
     }
 
     return pID;
+
+    // if (vID in Object.keys(targetDrive)) {
+    //   //working in "native"
+
+    //   if (existingFileData[vID]) {
+    //     // e.g. root/path...
+    //     // ->   /f_*name*
+    //     // if already exists, use same containing folder to upload to - regardless of upload type
+    //     pID = existingFileData[vID].containingFolder[1];
+    //   } else {
+    //     // need to create files part folder
+    //     // target Path only relevent if drive is target
+    //     // * should set target automatically based on current dir
+    //     const installDirID = targetPath[targetPath.length - 1][1];
+    //     pID = installDirID;
+
+    //     if (uploadType === 2)
+    //       pID = (await this.createFolder(installDirID, "__" + name)).data.id;
+
+    //     // if simple, parent is tos,
+    //     // else create folder, return taht folder id
+
+    //     // dont need to create this folder, if simple upload
+    //   }
+    // } else {
+    //   //working in "foreign"
+    //   let foreign = foreignFolders[vID];
+
+    //   if (existingFileData[vID]) {
+    //     //? foregin must exist here surely - since where else would the containing folder be if it exists?
+
+    //     // e.g. root/__foreign__/
+    //     // -> /f_*name*
+
+    //     //! need to consider if containingFolder can be changed
+    //     //! e.g. case of changing primary drive (target) where file is stored
+    //     //! -> native and foreign could switch
+    //     //* Assuming for now: cannot change the primary drive - means above (blue) query should hold
+    //     const parentFolder = existingFileData[vID].containingFolder;
+
+    //     pID = parentFolder[1];
+    //   } else {
+    //     let foreignID;
+    //     // if foreign does not exist
+    //     //create it
+    //     if (!foreign) {
+    //       foreignID = (await this.createFolder(ROOTID, "__foreign__")).data.id;
+    //     } else foreignID = foreign[1];
+    //     console.log("ggl doreign", foreign);
+
+    //     //if containing folder does not exist - it shouldnt since no existing copy
+    //     // create it
+    //     console.log("creating folder __", name, " in ", foreign);
+    //     pID = (await this.createFolder(foreignID, "__" + name)).data.id;
+    //   }
+    // }
+
+    // return pID;
   }
 
   //TODO

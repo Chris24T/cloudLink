@@ -26,26 +26,26 @@ const CHANNEL_NAME_RES = 'FileBrowser-Render-Response';
 function FilesBrowser(prps) {
 
     const {dirStack, convertUnits, setCurrentFolderSize, currentFolderSize,usageStatistics:usage, allFiles:fileTree, displayFiles:displayedFiles, setDisplayFiles, activePartition=true} = useContext(browserContentContext)
-    const [displayMode, setDisplayMode] = useState("simple")
+    const [displayMode, setDisplayMode] = useState("advanced")
     const [displayForm, setDisplayForm] = useState(true)
 
     let
     //[displayedFiles, setDisplayedFiles] = useState([]), //all handling meta data, only handle reall data at donwload or upload (not read)
     
-    setDisplayedFiles = setDisplayFiles,      
+    setDisplayedFiles = setDisplayFiles      
     //dirStack = dirStack,  //name, id
     //fileTree = useRef({}),
     //fileTree = allFiles,
     
-    config = useRef({
-      displayType:displayMode,
-      partitionConfig:"",
-      mode:{
-        uploadType:2, 
-        isSmart:0},      
-        connectedDrives: ["dropbox","google"], //order here decides who gets frist part - must match target drive
-        blockWidth:2000
-    })   
+    // config = useRef({
+    //   displayType:displayMode,
+    //   partitionConfig:"",
+    //   mode:{
+    //     uploadType:2, 
+    //     isSmart:0},      
+    //     connectedDrives: ["dropbox","google"], //order here decides who gets frist part - must match target drive
+    //     blockWidth:2000
+    // })   
 
     useEffect(() => {
       console.log("init render")      
@@ -68,13 +68,14 @@ function FilesBrowser(prps) {
       //const {google, dropbox} = getFolderSize(currentDirName)
       let usage = []
 
-      if(dStack.length > 1) {
+      if(dStack.length > 1 && !currentDirName.includes("Unpartitioned")) {
         console.log("dstacj", dStack)
         const partitionName = dStack[1][0]
         console.log("parition", fileTree.current[partitionName])
         const partitionLimits = fileTree.current[partitionName].partitionConfig.fulfillmentValue[0].targets
         const capacity = getFolderSize(partitionName)
-        usage = [[partitionLimits["google"].limit, capacity.google], [partitionLimits["dropbox"].limit, capacity.dropbox]]
+        console.log(partitionLimits)
+        usage = [[(partitionLimits["google"]?.limit) || -1, (capacity.google)||-1], [(partitionLimits["dropbox"]?.limit) || -1, (capacity?.dropbox || -1)]]
         
       } else {
         const {google, dropbox} = getFolderSize("home")
@@ -104,76 +105,165 @@ function FilesBrowser(prps) {
     
     // need to return which folder specifically it exists in - append item to path (dirstack)
     //currently returning contianign folder as if target were a file, but a file can exist as a fodler itself, i need THAT fodler
-    function findExistingFileData(toFind, searchSpace=fileTree.current, foreignFolders, {mode}) {
+    function findExistingFileData(toFind) {
       //default search space is global search space - recursive almost
       // want to change to currentDir
+      
+      // want to find existing existing data 
+      // am looking for parts - mode will decide whether to look for "__name" folder or just "name" file 
+
+      const directoryStack = dirStack.current
+      const allFiles = fileTree.current
 	  
-        console.log("Searching in", searchSpace)
-     	const files = []
-		  const {uploadType, isSmart} = mode
-      for( const item of toFind ) {
-		    const clipName =  item.name.split(".").slice(0, -1).join(".")
-        let fileData = {}
-		    console.log("f",Object.entries(foreignFolders))
-		//search foreign folders for data
-		for(const [clietnId, foreignRef] of Object.entries(foreignFolders)) {
+	  let uploadType = 0
 
-			console.log(foreignRef)
-			const foreignFolder = fileTree.current[foreignRef[1]]
-			console.log("foreign", foreignFolder)
-			for( const folder of Object.values(foreignFolder.children)) {
-
-				if(folder.name.includes("__"+/*clipName*/item.name)) {
-					console.log("Containing Folder Found in current foreign:",folder)
-					const container = fileTree.current[folder.id]
-					fileData[container.origin] = ({
-						containingFolder:[container.name, container.id, container.origin],
-						parts:container.children
-					})
-				}
-			}
-		}
-
-		// search local dir for data
-        for(const resource of Object.values(searchSpace)) {
-			
-          // found target part-container
-          if(resource.name.includes("__"+clipName) && resource.isFolder && (uploadType===2 || isSmart)) {
-              console.log("Containing Folder Found in current DIR:",resource)
-			  const container = fileTree.current[resource.id]
-              fileData[resource.origin] = ({
-                containingFolder:[container.name, container.id, container.origin],
-                parts: container.children
-              })
-			  
-          }
-
-          //found simple/standard upload copy
-          if(resource.name === item.name && (!resource.isFolder) && (uploadType===0 || uploadType===1)) {
-			console.log("Simple Copy Found:", resource)
-			const id = resource.id
-			const [dStr, dId] = dirStack.current[dirStack.current.length - 1]
-			fileData[resource.origin] = ({
-				containingFolder:[dStr, dId], // exists at end of dirStack
-				parts: {[id]:resource}
-			})
-			
-
-          }
-
-		  // must keep going through entire search space, make sure found all copies
-        }
-       
-        if(Object.keys(fileData).length === 0) {          
-          fileData = false          
-        }
-        
-        item.existingFileData = fileData
-        files.push(item)
-
+      const existingData = {
+        //file:google[id], dropbox[id] -> id set can be empty
       }
 
-      return files
+      if(directoryStack.length > 1) {
+        //in a partition, restirct search just to working partitoion
+		// set upload type to correct from config
+		const partitionName = directoryStack[1][0]
+		const partition = allFiles[partitionName]
+		uploadType = partition.partitionConfig.fulfillmentValue[0].mode.uploadType
+		const searchFolder = allFiles[directoryStack[directoryStack.length-1][0]]
+		_compare(toFind, /*partition*/ searchFolder)
+
+      } else {
+        // not in partition, must search unpartitioned folder children (top level only) for a copy
+
+        const partition = allFiles["p_Unpartitioned Files"]
+        _compare(toFind, partition)
+	}
+
+	return existingData
+
+      function _compare(files, container, r=0) {
+		
+        for( const findFile of files) {
+			const info = {name:findFile.name, path:findFile.path, size:findFile.size}
+			const existingFileData = {container, parts:{}, isSimple:true, isData:false}
+			existingData[findFile.name] = {info, existingFileData}
+				
+			for(const existingFile of Object.values(container.children)) {
+				
+				if(parseInt(uploadType) === 0 || parseInt(uploadType) === 1) {
+					//looking for file
+					console.log("Looking for file")
+					if(findFile.name === existingFile.name && !existingFile.isFolder) {
+						console.log("FB-ExistsData: ", existingFile)
+						//found simple copy
+						existingData[findFile.name].existingFileData.isData = true
+						for ( const [driveName, IDset] of Object.entries(existingFile.mergedIDs)) {
+												
+							existingData[findFile.name].existingFileData.parts[driveName] =  existingData[findFile.name].existingFileData.parts[driveName] || []
+							existingData[findFile.name].existingFileData.parts[driveName].push([findFile.name, IDset])
+							
+						}
+					}
+
+				} else {
+					//looking for __ part container
+					
+					console.log("FB-StripedExistingContainer: ", existingFile, findFile)
+					if(existingFile.name.includes(findFile.name) && existingFile.isFolder) {
+						//found "split" copy part container
+							
+							const partContainer = allFiles[existingFile.name]
+							existingData[findFile.name].existingFileData.isSimple = false
+							existingData[findFile.name].existingFileData.isData = true
+							existingData[findFile.name].existingFileData.container = partContainer
+							console.log("FB-PartCOntainer", partContainer)
+							for(const part of Object.values(partContainer.children)) {
+								for(const [driveName, IDset] of Object.entries(part.mergedIDs)) {
+									existingData[findFile.name].existingFileData.parts[driveName] =  existingData[findFile.name].existingFileData.parts[driveName] || []
+									existingData[findFile.name].existingFileData.parts[driveName].push([part.name, IDset])
+								}
+							}
+
+
+					}
+				}
+
+				if(r && existingFile.isFolder) {
+				//recursive
+					container = files[existingFile.name] 
+					_compare(files, container, 1)
+				}
+
+			}
+        }
+      }
+
+	  return existingData
+
+        
+    //  	files = []
+	// 	  //const {uploadType, isSmart} = mode
+    //   for( const item of toFind ) {
+	// 	    const clipName =  item.name.split(".").slice(0, -1).join(".")
+    //     let fileData = {}
+	// 	    console.log("f",Object.entries(foreignFolders))
+	// 	//search foreign folders for data
+	// 	for(const [clietnId, foreignRef] of Object.entries(foreignFolders)) {
+
+	// 		console.log(foreignRef)
+	// 		const foreignFolder = fileTree.current[foreignRef[1]]
+	// 		console.log("foreign", foreignFolder)
+	// 		for( const folder of Object.values(foreignFolder.children)) {
+
+	// 			if(folder.name.includes("__"+/*clipName*/item.name)) {
+	// 				console.log("Containing Folder Found in current foreign:",folder)
+	// 				const container = fileTree.current[folder.id]
+	// 				fileData[container.origin] = ({
+	// 					containingFolder:[container.name, container.id, container.origin],
+	// 					parts:container.children
+	// 				})
+	// 			}
+	// 		}
+	// 	}
+
+	// 	// search local dir for data
+    //     for(const resource of Object.values(searchSpace)) {
+			
+    //       // found target part-container
+    //       if(resource.name.includes("__"+clipName) && resource.isFolder && (uploadType===2 || isSmart)) {
+    //           console.log("Containing Folder Found in current DIR:",resource)
+	// 		  const container = fileTree.current[resource.id]
+    //           fileData[resource.origin] = ({
+    //             containingFolder:[container.name, container.id, container.origin],
+    //             parts: container.children
+    //           })
+			  
+    //       }
+
+    //       //found simple/standard upload copy
+    //       if(resource.name === item.name && (!resource.isFolder) && (uploadType===0 || uploadType===1)) {
+	// 		console.log("Simple Copy Found:", resource)
+	// 		const id = resource.id
+	// 		const [dStr, dId] = dirStack.current[dirStack.current.length - 1]
+	// 		fileData[resource.origin] = ({
+	// 			containingFolder:[dStr, dId], // exists at end of dirStack
+	// 			parts: {[id]:resource}
+	// 		})
+			
+
+    //       }
+
+	// 	  // must keep going through entire search space, make sure found all copies
+    //     }
+       
+    //     if(Object.keys(fileData).length === 0) {          
+    //       fileData = false          
+    //     }
+        
+    //     item.existingFileData = fileData
+    //     files.push(item)
+
+    //   }
+
+    //   return files
 
       /**
        * return: [files, foreign folders]
@@ -209,14 +299,19 @@ function FilesBrowser(prps) {
       // Above problem exists because: "foreign" folders(files) are named the file name only, cant distinguish between multiple copies of same file existing in "native"
       // possible solution: 1 - globally unique names, 2 - append to repeat name "name+(copy)", 3 - create subfolder in native/filename, subfolder is named the parent - contains parts for the file in that parent
       // 3 = best but pushed problem further e.g. two same files in two same parent folders...
-		const cfg = config.current
-	  const dStack = dirStack.current
-      const currentDirId = dStack[dStack.length - 1][1]
-	  console.log(currentDirId)
-      const currentDir = fileTree.current[currentDirId].children
-	  const foreignFolders = findForeignFolders()
-      const toUpload = [findExistingFileData(droppedFiles, currentDir, foreignFolders, cfg), foreignFolders]
-      uploadFiles(toUpload)  
+	// 	const cfg = config.current
+	//   const dStack = dirStack.current
+    // const currentDirId = dStack[dStack.length - 1][0]
+	//   console.log(currentDirId)
+    // const currentDir = fileTree.current[currentDirId].children
+	//   const foreignFolders = findForeignFolders()
+
+		const directory = dirStack.current
+		const partitionName = directory.length
+
+    const toUpload = findExistingFileData(droppedFiles)
+	console.log("FB: Existing Data Result", toUpload)
+    uploadFiles(toUpload)  
     })
       
       // // Extract paths
@@ -382,9 +477,10 @@ function FilesBrowser(prps) {
         const driveusage = usage.current
         
         const {googleReserved, dropboxReserved} = getReserved()
+        
         const googleWidth = (Math.floor((100*(googleReserved||1)/driveusage?.google?.allocated||100))||1)+"%"
         const dropboxWidth =( Math.floor(( 100*(dropboxReserved||1)/driveusage?.dropbox?.allocated||100)) || 1)+"%"
-
+        console.log("width", googleWidth, dropboxWidth)
         const googleUsed =( driveusage?.google?.used||1)
         const dropboxUsed = (driveusage?.dropbox?.used)
         const googleAlloc = (driveusage?.google?.allocated||100)
@@ -486,11 +582,11 @@ function FilesBrowser(prps) {
 
                 <select class="form-select" aria-label="Default select example">
                 <option selected>Partition RAID Type</option>
-                <option value="1">Span</option>
-                <option value="2">Mirror</option>
-                <option value="3">Stripe</option>
-                <option value="4">Mirror-Stripe</option>
-                <option value="5" disabled="true" >Parity (Not Yet Supported)</option>
+                <option value="0">Span</option>
+                <option value="1">Mirror</option>
+                <option value="2">Stripe</option>
+                <option value="3">Mirror-Stripe</option>
+                <option value="4" disabled="true" >Parity (Not Yet Supported)</option>
               </select>
 
                 </div>
@@ -498,7 +594,7 @@ function FilesBrowser(prps) {
                 <div className="col-5">
 
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="" id="flexCheckSmart"/>
+                  <input class="form-check-input" type="checkbox" value="1" id="flexCheckSmart"/>
                   <label class="form-check-label" for="flexCheckDefault">
                     Enable Smarter Uploads
                   </label>
@@ -629,7 +725,7 @@ function FilesBrowser(prps) {
             })()
           }
 
-            <ControlBar toggleDisplayMode={() => toggleDisplayMode()} toggleSmartUpload={() => toggleSmartUpload(config.current)} refresh={fetchFileData} speak={() => console.log("hello")} back={() => changeWorkingDirectory("back") }  setConfig={(e) => setConfig(e)}></ControlBar>
+            <ControlBar toggleDisplayMode={() => toggleDisplayMode()} toggleSmartUpload={() => toggleSmartUpload()} refresh={fetchFileData} speak={() => console.log("hello")} back={() => changeWorkingDirectory("back") }  setConfig={(e) => setConfig(e)}></ControlBar>
           
         </div>
 
@@ -667,11 +763,15 @@ function FilesBrowser(prps) {
           name:folderName.value,
           isPartition: dir.length === 1,
           allocation:{
-            "google":{limit:GGLAlloc?.value, usage:0},
-            "dropbox":{limit:DBXAlloc?.value, usage:0}
+            "google":{limit:(parseInt(GGLAlloc?.value))*1024*1024, usage:0},
+            "dropbox":{limit:(parseInt(DBXAlloc?.value))*1024*1024, usage:0}
           },
-          mode:mode?.value,
-          isSmart:isSmart?.value
+          blockWidth:2000,
+          mode: {
+            uploadType: parseInt(mode?.value),
+            isSmart: isSmart?.checked
+          }
+          
         }
       }
 
@@ -748,21 +848,7 @@ function FilesBrowser(prps) {
   }
 
   function setConfig(el) {
-    alert("Configuration Saved")
-
-    let cfg = config.current
-    let cd = []
-    const g = document.getElementById("googleConn").className.includes("disabled") ? 0 : cd.push("google")
-    const d = document.getElementById("dropboxConn").className.includes("disabled") ? 0 : cd.push("dropbox")
-    const m = document.getElementById("megaConn").className.includes("disabled") ? 0 : cd.push("mega")
-    
-    const mode = document.getElementById("mode-select").value
-       
-    config.current.connectedDrives = cd
-    config.current.mode = mode
-    //config.current.lastDir = dirStack.current[dirStack.current.length - 1]
-
-    console.log("Config Set:", config.current)
+   
    
   }
 
@@ -770,42 +856,44 @@ function FilesBrowser(prps) {
     //to make it seem faster/less hang time
 
     //send file list to server side
-    function uploadFiles([files, foreignFolders]) {
+    function uploadFiles(files) {
+      const dStack = dirStack.current
       const fullWorkingDir = dirStack.current // current working directory stack
-      const containingDirId = fullWorkingDir[fullWorkingDir.length-1][1] // Top level directory (wokring directory) id
+      const containingDirId = fullWorkingDir[fullWorkingDir.length-1][0] // Top level directory (wokring directory) id
       const containingDir = fileTree.current[containingDirId] // Get the containing folder by workingdir id
-      const reqconfig = config.current // Upload config e.g. stripe
-		console.log("containingDir", containingDir)
-      //What is config: dictates upload type - how?
-      // isSmart, then raid mode - 
-      // let config = {
-      //   mode:0;
-      //   connectedDrives:["google"]
-      // }
+      
+	  // generic toplevel drop config
+      let config = {          
+          mode:{
+            uploadType:0, 
+            isSmart:0},      
+          targets: {google:"", dropbox:""}, //order here decides who gets frist part - must match target drive
+          blockWidth:2000
+        }
+      
 
       if(fullWorkingDir.length > 1) {
-        //am in a partition
+        const partiionDir = fileTree.current[dStack[1][0]]
+        const partitionCfg = partiionDir.partitionConfig.fulfillmentValue[0]
+        config = partitionCfg 
+      }   
+	  
+	  console.log("FB Upload Files Config:", config)
 
-      }
-
-      const paritionID = fileTree[fullWorkingDir[1][1]].partition
-
+      //const paritionID = fileTree[fullWorkingDir[1][1]].partition
+      
       const requestBody = {
         params: {
-          config:reqconfig,
-          targetDrive: containingDir.origin || "google" || this.connectedDrives[Math.floor(Math.random()*this.connectedDrives.length)], //!Targt set to folder file is dropped in, if root, pick randomly
-          targetPath: fullWorkingDir,
-          foreignFolders          
+          config,
+          droppedContainer: containingDir,
+          droppedPath: fullWorkingDir,
+                    
         },
-        data: Object.values(files).map( ({name, path, size, existingFileData}) => {
+        data: Object.values(files).map( ({info, existingFileData}) => {
           return (
             {              
-              name, // from os
-              path, // from os
-              size, // from os
-              // existing name, id of the same file or false if doesnt exist
-              existingFileData // should be another dirstack if looking globally - taken from existing drive info (not sytem (OS) info)
-              // also need the parts (names, id) - so they can be compared against
+              fileInfo:info, // from os              
+              existingFileData
             }
           )
         })

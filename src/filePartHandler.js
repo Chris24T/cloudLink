@@ -23,52 +23,159 @@ class filePartHandler {
    * @returns {object} looks like: {"google":[{part1, part3}], "dropbox":[{part2, part4}]}
    */
   async buildParts(
-    { path, size, existingFileData },
-    { connectedDrives: vendors, blockWidth: chunkSize = 4194304, mode }
+    { fileInfo, existingFileData },
+    { targets, blockWidth: chunkSize = 4194304, mode }
   ) {
+    //! Have targets, so also have usage - can distribute based on that
+    //! will also need to set usage at some point though from front end
     const { uploadType, isSmart } = mode;
+    const { name, path, size } = fileInfo;
+    const vendorList = Object.keys(targets);
+
+    const toUpload = vendorList.reduce((acc, v) => (acc[v] = []) && acc, {}),
+      toDelete = vendorList.reduce((acc, v) => (acc[v] = []) && acc, {}),
+      toRename = vendorList.reduce((acc, v) => (acc[v] = []) && acc, {});
 
     let partCounter = 0,
       lastMatchOffset = 0,
       offset = 0,
       step = 1;
 
-    const toUpload = vendors.reduce((acc, v) => (acc[v] = []) && acc, {}),
-      toDelete = vendors.reduce((acc, v) => (acc[v] = []) && acc, {}),
-      toRename = vendors.reduce((acc, v) => (acc[v] = []) && acc, {});
-
-    // No data exists - chunk entire file -> overwrite any existing data
-
-    /**
-     * If
-     */
-    if (
-      uploadType === 0 ||
-      !existingFileData ||
-      (uploadType === 2 && isSmart === 0)
-    ) {
-      const parts = await this.chunkBetween(path, {
+    //chunk entire file
+    console.log("PH Recieved Config:", mode);
+    console.log("PH Recieved FileDetails:", fileInfo);
+    if (parseInt(uploadType) === 0) {
+      //simple - upload file as single unit, to first drive with space, delete existing file
+      console.log("PH Chunking Entrire File");
+      const fileParts = await this.chunkBetween(path, {
         start: 0,
         end: size,
-        chunkSize,
+        chunkSize: size,
         counter: partCounter,
       });
 
-      parts.forEach((part, i) => {
-        toUpload[vendors[i % vendors.length]].push(part);
+      fileParts.forEach((part) => {
+        toUpload[vendorList[0]].push(part);
       });
 
-      if (
-        existingFileData &&
-        (uploadType === 0 || (uploadType === 2 && isSmart === 0))
-      ) {
-        for (const [clientId, clientData] of Object.entries(existingFileData)) {
-          toDelete[clientId] = Object.values(clientData.parts);
+      if (existingFileData.isData) {
+        for (const [clientId, clientData] of Object.entries(
+          existingFileData.parts
+        )) {
+          toDelete[clientId] = clientData;
         }
       }
+    } else if (parseInt(uploadType) === 1) {
+      //mirror - upload file as single unit, to all connected drives, delete existing copies
+      const fileParts = await this.chunkBetween(path, {
+        start: 0,
+        end: size,
+        chunkSize: size,
+        counter: partCounter,
+      });
 
-      return [toUpload, toDelete, toRename];
+      fileParts.forEach((part) => {
+        for (const vendor of vendorList) {
+          toUpload[vendor].push(part);
+        }
+      });
+
+      if (existingFileData.isData) {
+        for (const [clientId, clientData] of Object.entries(
+          existingFileData.parts
+        )) {
+          toDelete[clientId] = clientData;
+        }
+      }
+    } else if (parseInt(uploadType) === 2) {
+      //stripe - upload as split file, share between connected drives, delete existing parts if not smart
+      let fileParts;
+      if (!isSmart || !existingFileData.isData) {
+        fileParts = await this.chunkBetween(path, {
+          start: 0,
+          end: size,
+          chunkSize,
+          counter: partCounter,
+        });
+
+        fileParts.forEach((part, i) => {
+          toUpload[vendorList[i % vendorList.length]].push(part);
+        });
+
+        if (existingFileData.isData) {
+          for (const [clientId, clientData] of Object.entries(
+            existingFileData.parts
+          )) {
+            toDelete[clientId] = clientData;
+          }
+        }
+      } else if (existingFileData && isSmart) {
+        //recovery
+      }
+    } else if (parseInt(uploadType) === 3) {
+      //mirror stripe - upload as split file, to all connected drives (copied), delete existing parts if not smart
+
+      let fileParts;
+      if (!isSmart || !existingFileData.isData) {
+        fileParts = await this.chunkBetween(path, {
+          start: 0,
+          end: size,
+          chunkSize,
+          counter: partCounter,
+        });
+
+        fileParts.forEach((part) => {
+          for (const vendor of vendorList) {
+            toUpload[vendor].push(part);
+          }
+        });
+
+        if (existingFileData.isData) {
+          for (const [clientId, clientData] of Object.entries(
+            existingFileData.parts
+          )) {
+            toDelete[clientId] = clientData;
+          }
+        }
+      } else if (existingFileData && isSmart) {
+        //recovery
+      }
     }
+
+    // if (existingFileData && !isSmart) {
+    //   //delete parts
+    // } else if (existingFileData && isSmart) {
+    //   //recover from parts - delete redundant parts
+    // }
+
+    // if (
+    //   uploadType === 0 ||
+    //   !existingFileData ||
+    //   (uploadType === 2 && isSmart === 0)
+    // ) {
+    //   if (uploadType === 0) chunkSize = size;
+    //   const parts = await this.chunkBetween(path, {
+    //     start: 0,
+    //     end: size,
+    //     chunkSize,
+    //     counter: partCounter,
+    //   });
+
+    //   parts.forEach((part, i) => {
+    //     toUpload[vendors[i % vendors.length]].push(part);
+    //   });
+
+    //   if (
+    //     existingFileData &&
+    //     (uploadType === 0 || (uploadType === 2 && isSmart === 0))
+    //   ) {
+    //     for (const [clientId, clientData] of Object.entries(existingFileData)) {
+    //       toDelete[clientId] = Object.values(clientData.parts);
+    //     }
+    //   }
+
+    return [toUpload, toDelete, toRename];
+    //}
 
     // recovery
     while (offset < size) {
@@ -95,7 +202,7 @@ class filePartHandler {
             // can now chunk all data before this point and the last match (the edited region)
             //? should internally increment part counter for each chunk it generates
             // distributing new uplaods equally - //!currently ignoring balancing file numbers across drives
-            toUpload[vendors[partCounter % vendors.length]].push(
+            toUpload[vendorList[partCounter % vendorList.length]].push(
               ...this.chunkBetween(path, {
                 start: lastMatchOffset,
                 end: offset,
@@ -122,7 +229,7 @@ class filePartHandler {
     // only previously chunked the parts between matches
     // need to also chunk eveything after the last match
     // console.log("Final Region Chunking")
-    toUpload[vendors[partCounter % vendors.length]].push(
+    toUpload[vendorList[partCounter % vendorList.length]].push(
       ...(await this.chunkBetween(path, {
         start: lastMatchOffset,
         end: offset,
@@ -156,6 +263,8 @@ class filePartHandler {
     //console.log("Generating chunks between bytes:", start, end, "Chunk Size:", chunkSize)
     let parts = [];
     let offset = start;
+
+    console.log("PH: Chunking start end chunksize", start, end, chunkSize);
 
     while (offset < end) {
       const content = fs.createReadStream(path, {

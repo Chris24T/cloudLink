@@ -3,6 +3,7 @@ const fs = require("fs");
 const { Dropbox } = require("dropbox");
 const { file } = require("googleapis/build/src/apis/file");
 const fetch = require("node-fetch");
+const { isCompositeComponent } = require("react-dom/test-utils");
 
 const CLIENT_ID = process.env.DROPBOX_AUTH_CLIENT_ID,
   CLIENT_SECRET = process.env.DROPBOX_AUTH_CLIENT_SECRET,
@@ -67,52 +68,53 @@ class dropboxAuth {
     }
   }
 
-  deleteFiles(files, targetInfo, mode) {
+  deleteFiles(files) {
     let partCounter = 0;
-
+    if (files.length === 0) return;
     this.authorize((client) => {
-      files.forEach(({ fileInfo, parts }) => {
-        console.log("DBX: ", parts.length, " delete request for this file");
-
-        if (parts.length === 0) return;
-        fileInfo.path = this.findPath(fileInfo, targetInfo, mode);
-
-        parts.forEach((part) => {
-          _deleteFile(client, fileInfo, part, partCounter);
-        });
+      files.forEach((file) => {
+        _deleteFile(client, file);
       });
     });
 
-    function _deleteFile(client, fileInfo, file, pNum) {
+    function _deleteFile(client, [name, id]) {
       const resp = client.filesDeleteV2(
         {
-          path: file.id || file.path,
+          path: id[0],
         },
         (err) => console.log(err)
       );
-      resp.then((message) => console.log("DBX Delete Response:", message));
     }
   }
 
   uploadFiles(files, targetInfo, mode) {
+    const { uploadType } = mode;
     let fileCounter = 1,
       partCounter = 1;
 
     this.authorize((client) => {
-      files.forEach(({ fileInfo, parts }) => {
+      files.forEach(({ file, parts }) => {
+        const { fileInfo, existingFileData } = file;
         console.log(
           "DBX: ",
           parts.length,
-          " total upload request for this file"
+          " Upload requests for",
+          fileInfo.name
         );
 
         if (parts.length === 0) return;
-        if (parts.length === 1) parts[0].name = fileInfo.name;
-        fileInfo.path = this.findPath(fileInfo, targetInfo, mode);
+        if (parts.length === 1 && (uploadType !== 2 || uploadType !== 3))
+          parts[0].name = fileInfo.name;
+
+        fileInfo.path = this.findPath(file, targetInfo, mode);
+        console.log("DBX: Dropbox upload Path", fileInfo.path);
         parts.forEach((part) => {
           _uploadFile(client, fileInfo, part, partCounter);
+          partCounter++;
         });
       });
+      partCounter = 1;
+      fileCounter++;
     });
 
     function _uploadFile(client, fileInfo, fileContent, pNum) {
@@ -143,7 +145,6 @@ class dropboxAuth {
     });
 
     return resp.then((val) => {
-      console.log("dbx val", val);
       return {
         origin: "dropbox",
         allocated: val.result.allocation.allocated,
@@ -182,10 +183,11 @@ class dropboxAuth {
   }
 
   findPath(
-    { name, existingFileData },
-    { targetDrive, targetPath, foreignFolders },
+    { fileInfo, existingFileData },
+    { droppedContainer, droppedPath },
     { uploadType, isSmart }
   ) {
+    const { name } = fileInfo;
     //cutting off extension
     //name = name.split(".").slice(0, -1).join(".");
     const vID = this.vendor;
@@ -194,32 +196,39 @@ class dropboxAuth {
     // dropbox will create the folder if it doesnt exist by path,
     // so no need to create folders
 
-    const tPath = targetPath.reduce((acc, [name, id]) => {
+    const tPath = droppedPath.reduce((acc, [name, id]) => {
       if (id === "root") return acc;
       return acc + name + "/";
     }, "");
 
-    if (targetDrive === vID) {
-      console.log("DBX is primary Recipent");
-
-      if (existingFileData[vID]) {
-        if (uploadType === 0) path = ROOTID + tPath;
+    console.log("DBX: Findpath tpath", tPath);
+    console.log(
+      "DBX: Dropped Container keys",
+      Object.keys(droppedContainer.mergedIDs)
+    );
+    if (Object.keys(droppedContainer.mergedIDs).includes(vID)) {
+      console.log("DBX: Key found");
+      if (existingFileData.isData) {
+        if (parseInt(uploadType) === 0 || parseInt(uploadType) === 1)
+          path = ROOTID + tPath;
         else path = ROOTID + tPath + "__" + name + "/";
       } else {
-        if (uploadType === 0) path = ROOTID + tPath;
+        if (parseInt(uploadType) === 0 || parseInt(uploadType) === 1)
+          path = ROOTID + tPath;
         else path = ROOTID + tPath + "__" + name + "/";
-      }
-    } else {
-      console.log("DBX is non-primary Recipent");
-
-      let foreign = foreignFolders[vID];
-
-      if (existingFileData[vID]) {
-        path = ROOTID + "__foreign__" + "/__" + name + "/";
-      } else {
-        path = ROOTID + "__foreign__" + "/__" + name + "/";
       }
     }
+    // } else {
+    //   console.log("DBX is non-primary Recipent");
+
+    //   let foreign = foreignFolders[vID];
+
+    //   if (existingFileData[vID]) {
+    //     path = ROOTID + "__foreign__" + "/__" + name + "/";
+    //   } else {
+    //     path = ROOTID + "__foreign__" + "/__" + name + "/";
+    //   }
+    // }
 
     return path;
   }

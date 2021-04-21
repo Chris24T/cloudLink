@@ -66,6 +66,7 @@ function DriveCapacity(props) {
             </React.Fragment>
         )
           
+        
     }
     
     function PartitionCapacity() {

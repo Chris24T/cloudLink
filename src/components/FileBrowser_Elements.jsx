@@ -54,9 +54,11 @@ export function FilesBrowser_Folders(props) {
         
             return(
                 
+                
                 <div    onClick={
                             () => folderFuncs.onClickChild("fwd", [folder.name, folder.mergedIDs])} 
                         className="folder" key={folder.id} >
+                            {optionMenu(folder)}
                             {originDisplay(folder)}            
                     <span>{folder.displayName || folder.name} </span>
                 </div>
@@ -71,6 +73,31 @@ export function FilesBrowser_Folders(props) {
 
 }
 
+function optionMenu(folder) {
+    return (
+        <div className="detailButton" style={{ position:"absolute", left:"0%", top:"0px", padding :"0px", margin:"0px"}}>
+            
+            <div class="btn-group dropstart" style={{}}>
+            <button type="button" style={{padding:0,margin:0, backgroundColor:"black", borderRadius:"5px"}} class="btn btn-secondary" data-bs-toggle="dropdown" onClick={(e)=> e.stopPropagation()}aria-expanded="false">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
+                <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+                </svg>
+            </button>
+            <ul class="dropdown-menu">
+            <li><button className="dropdownButton" style={{}} onClick={(e)=> {e.stopPropagation(); deleteItem(folder)} }>Delete</button></li>
+            <li><button className="dropdownButton" onClick={(e)=>e.stopPropagation()}>View Details</button></li>
+            <li><button className="dropdownButton" onClick={(e)=>e.stopPropagation()}>Download</button></li>
+            </ul>
+            </div>
+        </div>
+
+    )
+}
+
+function deleteItem(item)
+ {
+    console.log("delete", item)
+ }
 export function FilesBrowser_Files(props) {
     const 
     files = props.fi,

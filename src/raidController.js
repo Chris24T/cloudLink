@@ -28,9 +28,11 @@ class raidController {
    */
 
   uploadFiles({ config, ...targetInfo }, files) {
-    //console.log("Initiating Upload of total [", files.length, "] files");
+    const { targets, mode } = config;
+    let recipients = Object.keys(targets);
 
-    const { connectedDrives: recipients, blockWidth, mode } = config;
+    console.log("RC: Upload Target Info", targetInfo);
+    console.log("RC: Upload Files", files);
 
     files.forEach(async (file) => {
       const [
@@ -39,23 +41,17 @@ class raidController {
         toRenameParts,
       ] = await partHandler.buildParts(file, config); // width is being passed from config
 
-      //const toUploadCount = toUploadParts.reduce( (acc, el) => )
-
-      //console.log();
+      console.log("RC: Parts To Upload", toUploadParts);
 
       callClients((clientId, client) => {
         // upload new data - edits
-        client.deleteFiles(
-          [{ fileInfo: file, parts: toDeleteParts[clientId] }],
-          targetInfo,
-          mode
-        );
+        client.deleteFiles(toDeleteParts[clientId]);
 
         //timeout for api rate limits
         setTimeout(() => {
           // delete redundant data
           client.uploadFiles(
-            [{ fileInfo: file, parts: toUploadParts[clientId] }],
+            [{ file, parts: toUploadParts[clientId] }],
             targetInfo,
             mode
           );
@@ -69,26 +65,28 @@ class raidController {
 
   createFolder(
     { targetDrive, targetPath },
-    { name, isPartition, allocation, mode, isSmart }
+    { name, isPartition, blockWidth, allocation, mode }
   ) {
     //console.log("CREATING FOLDER in", targetPath);
-    console.log("fodler create targetrs", targetDrive);
-    console.log("fodler create targetrs", targetPath);
+    // console.log("fodler create targetrs", targetDrive);
+    // console.log("fodler create targetrs", targetPath);
     if (isPartition) {
       //Parition folder creation
       name = "p_" + name;
-      console.log("will loop over", Object.entries(allocation));
+      //("will loop over", Object.entries(allocation));
       const targets = Object.entries(allocation).reduce(
         (acc, [drive, alloc]) => {
-          console.log("loop", drive, alloc);
+          //console.log("loop", drive, alloc);
           if (alloc.limit) acc[drive] = alloc;
           return acc;
         },
         {}
       );
 
+      //want the names of the drives whose limit is non zero
+
       //console.log("Parition Name", name);
-      paritionInfoDB.insert({ name: name, mode, isSmart, targets });
+      paritionInfoDB.insert({ name, mode, targets, blockWidth });
       callClients((clientId, client) => {
         client.createPartitionFolder(name);
       }, Object.keys(targets));
@@ -111,7 +109,7 @@ class raidController {
     });
 
     return Promise.all(usage).then((usage) => {
-      console.log("usage", usage);
+      //console.log("usage", usage);
       return usage.reduce((acc, el) => {
         acc[el.origin] = el;
         return acc;
