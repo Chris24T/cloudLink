@@ -110,7 +110,104 @@ class filePartHandler {
           }
         }
       } else if (existingFileData && isSmart) {
+        console.log("recveriong");
         //recovery
+        recovery.call(this);
+        return [toUpload, toDelete, toRename];
+
+        console.log("PH: INITATING RECOVERY");
+
+        while (offset < size) {
+          // Generate a (single) New part
+
+          const newPart = (
+            await this.chunkBetween(path, {
+              start: offset,
+              end: offset + chunkSize,
+              chunkSize,
+              counter: partCounter,
+            })
+          )[0];
+
+          if (offset === 0) console.log("first chunk:", newPart.name);
+          //if(offset === 2000) console.log("next match", newPart.name)
+
+          //test new part against existing parts
+          for (const [clientID, clientData] of Object.entries(
+            existingFileData.parts
+          )) {
+            for (const [partName, partId] of clientData) {
+              // console.log(
+              //   "PH-Checking Part: Existing vs New",
+              //   partName,
+              //   newPart.name
+              // );
+              // if (offset === 0)
+              //   console.log("first chunk, existing:", newPart.name, partName);
+              if (partName.includes(newPart.name.split("||")[0])) {
+                //found hash match
+
+                console.log(
+                  "PH: Found Hash Match:",
+                  newPart.name.split("||")[0]
+                );
+                //need to chunk everything that was not matched before this match
+                // console.log(
+                //   "BackCHunking start end chunksize",
+                //   lastMatchOffset,
+                //   offset,
+                //   chunkSize
+                // );
+
+                const fileParts = await this.chunkBetween(path, {
+                  start: lastMatchOffset + 1, // starting at last match - chunk all data before current postition but after the last match
+                  end: offset - chunkSize, //ending at current position
+                  chunkSize,
+                  partCounter,
+                });
+
+                console.log("edited regions", fileParts);
+
+                // skip over duplicate (matched) chunk
+                offset += chunkSize - 1;
+                // rember terminal offset of last match location (from end of chunk)
+                lastMatchOffset = offset;
+                // found an (existing) part, so must inc part counter
+                partCounter++;
+
+                // console.log(
+                //   "update offset, lastmatch",
+                //   offset,
+                //   lastMatchOffset
+                // );
+
+                if (parseInt(partName.split("_")[1]) !== partCounter) {
+                  //push to toRename
+                  const partNameChecksum = partName.split("_")[0];
+                  toRename[clientID].push([
+                    partNameChecksum + "_" + partCounter,
+                    partId,
+                  ]);
+                } else {
+                  //else dont have to push this matched part - do nothing with this part
+                }
+
+                //distribute new chunks to toUpload
+                // fileParts.forEach((part) => {
+                //   for (const vendor of vendorList) {
+                //     toUpload[vendor].push(part);
+                //   }
+                // });
+              } else {
+                //No match, try very next chunk (at offset+1)
+                if (offset === 0) console.log("inc offset");
+              }
+            }
+          }
+          offset += step;
+        }
+
+        //need to build toDelete here
       }
     } else if (parseInt(uploadType) === 3) {
       //mirror stripe - upload as split file, to all connected drives (copied), delete existing parts if not smart
@@ -138,7 +235,75 @@ class filePartHandler {
           }
         }
       } else if (existingFileData && isSmart) {
-        //recovery
+        console.log("PH: INITATING RECOVERY");
+
+        while (offset < size) {
+          // Generate a (single) New part
+          const newPart = (
+            await this.chunkBetween(path, {
+              start: offset,
+              end: offset + chunkSize + 1,
+              chunkSize,
+              counter: partCounter,
+            })
+          )[0];
+
+          //test new part against existing parts
+          for (const [clientID, clientData] of Object.entries(
+            existingFileData.parts
+          )) {
+            for (const [partName, partId] of clientData) {
+              console.log(
+                "PH-Checking Part: Existing vs New",
+                partName,
+                newPart.name
+              );
+              console.log("jello");
+              if (partName.includes(newPart.name.split("_")[0])) {
+                //found hash match
+                console.log("hlleo");
+                console.log("PH: Found Hash Match:", partName, newPart.name);
+                //need to chunk everything that was not matched before this match
+                const fileParts = await this.chunkBetween(path, {
+                  start: lastMatchOffset, // starting at last match - chunk all data before current postition but after the last match
+                  end: offset, //ending at current position
+                  chunkSize,
+                  partCounter,
+                });
+
+                // skip over duplicate (matched) chunk
+                offset += chunkSize;
+                // rember terminal offset of last match location (from end of chunk)
+                lastMatchOffset = offset;
+                // found an (existing) part, so must inc part counter
+                partCounter++;
+
+                if (parseInt(partName.split("_")[1]) !== partCounter) {
+                  //push to toRename
+                  const partNameChecksum = partName.split("_")[0];
+                  toRename[clientID].push([
+                    partNameChecksum + "_" + partCounter,
+                    partId,
+                  ]);
+                } else {
+                  //else dont have to push this matched part - do nothing with this part
+                }
+
+                //distribute new chunks to toUpload
+                // fileParts.forEach((part) => {
+                //   for (const vendor of vendorList) {
+                //     toUpload[vendor].push(part);
+                //   }
+                // });
+              } else {
+                //No match, try very next chunk (at offset+1)
+                console.log("inc offset", offset);
+                offset += step;
+              }
+            }
+          }
+        }
+        //need to build toDelete here (after chunking finished and we know what exists and what is redundant)
       }
     }
 
@@ -256,6 +421,77 @@ class filePartHandler {
 
     // looks like: [ {google:[part, part], dropbox:[part,part]}. {*same*}. {*same*}]
     return [toUpload, toDelete, toRename];
+
+    async function recovery() {
+      console.log("PH: INITATING RECOVERY");
+      let isFound = false;
+      while (offset < size) {
+        isFound = false;
+
+        // build test part
+        const newPart = (
+          await this.chunkBetween(path, {
+            start: offset,
+            end: offset + chunkSize,
+            chunkSize,
+            counter: partCounter,
+          })
+        )[0];
+
+        const newPartChecksum = newPart.name.split("||")[0];
+
+        //loop through existing parts
+
+        for (const [clientId, clientData] of Object.entries(
+          existingFileData.parts
+        )) {
+          for (const [partName, partId] of clientData) {
+            if (partName.includes(newPartChecksum)) {
+              isFound = true;
+
+              console.log("Hash Match Found");
+              //need to recover edited regions now
+
+              const editedRegionParts = await this.chunkBetween(path, {
+                start: lastMatchOffset, //start offset found in previous chunk, so +1?
+                end: offset, //end offset found in next chunk, so -1?
+                chunkSize,
+                counter: partCounter,
+              });
+
+              partCounter += editedRegionParts.length;
+
+              partCounter += 1;
+
+              //console.log("Edited Region", await editedRegionParts);
+
+              editedRegionParts.forEach((part, i) => {
+                if (uploadType === 2) {
+                  //distribute equally
+                  toUpload[vendorList[i % vendorList.length]].push(part);
+                } else if (uploadType === 3) {
+                  //duplicate across both
+                }
+              });
+
+              if (partName.split("||")[1] !== partCounter) {
+                const newName = newPartChecksum + "||" + partCounter;
+                toRename[clientId].push([partId, newName]);
+              }
+
+              lastMatchOffset = offset + chunkSize;
+
+              //edited regions go to toUpload
+
+              // if chunk position no longet correct, need to rename
+            }
+          }
+        }
+
+        offset += isFound ? chunkSize : 1;
+        //partCounter += isFound ? 1 : 0;
+      }
+    }
   }
 
   // splits a file into chunks, number of chunks depends on start and end param
@@ -263,8 +499,8 @@ class filePartHandler {
     //console.log("Generating chunks between bytes:", start, end, "Chunk Size:", chunkSize)
     let parts = [];
     let offset = start;
-
-    console.log("PH: Chunking start end chunksize", start, end, chunkSize);
+    if (start === end) return parts;
+    //console.log("PH: Chunking start end chunksize", start, end, chunkSize);
 
     while (offset < end) {
       const content = fs.createReadStream(path, {
@@ -284,7 +520,9 @@ class filePartHandler {
       part.checksum = contentChecksum;
       part.content = content;
       part.size = offset + chunkSize + 1;
-
+      // if (offset % chunkSize === 0)
+      //   console.log("offset end chunksize", offset, end, chunkSize);
+      //console.log("builtPart at offset end chunksize ", offset, end, chunkSize);
       parts.push(part);
       // if is not returning incremented value, can just use the parent scopes "partCounter"
 

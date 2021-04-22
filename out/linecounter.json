@@ -416,6 +416,420 @@
                     "filename": "tokens/googleDrive-access-token.json"
                 }
             ]
+        },
+        {
+            "version": "0.2.7",
+            "counttime": "2021-04-21 23:19:40",
+            "filesum": 60,
+            "codesum": 22717,
+            "commentsum": 1086,
+            "blanksum": 1554,
+            "statistics": {
+                "": {
+                    "code": 23,
+                    "comment": 30,
+                    "blank": 5
+                },
+                ".json": {
+                    "code": 17978,
+                    "comment": 0,
+                    "blank": 3
+                },
+                ".js": {
+                    "code": 3043,
+                    "comment": 749,
+                    "blank": 953
+                },
+                ".css": {
+                    "code": 491,
+                    "comment": 12,
+                    "blank": 97
+                },
+                ".jsx": {
+                    "code": 1121,
+                    "comment": 281,
+                    "blank": 451
+                },
+                ".txt": {
+                    "code": 6,
+                    "comment": 2,
+                    "blank": 0
+                },
+                ".html": {
+                    "code": 13,
+                    "comment": 0,
+                    "blank": 9
+                },
+                ".md": {
+                    "code": 42,
+                    "comment": 12,
+                    "blank": 36
+                }
+            },
+            "filelist": [
+                {
+                    "blank": 5,
+                    "code": 22,
+                    "comment": 30,
+                    "filename": ".env"
+                },
+                {
+                    "blank": 0,
+                    "code": 1,
+                    "comment": 0,
+                    "filename": ".gitignore"
+                },
+                {
+                    "blank": 86,
+                    "code": 202,
+                    "comment": 43,
+                    "filename": "build/auth.js"
+                },
+                {
+                    "blank": 9,
+                    "code": 43,
+                    "comment": 3,
+                    "filename": "build/auth/auth.onedrive.js"
+                },
+                {
+                    "blank": 7,
+                    "code": 61,
+                    "comment": 24,
+                    "filename": "build/auth/awaitTest.js"
+                },
+                {
+                    "blank": 51,
+                    "code": 133,
+                    "comment": 36,
+                    "filename": "build/auth/dropbox.js"
+                },
+                {
+                    "blank": 67,
+                    "code": 207,
+                    "comment": 13,
+                    "filename": "build/auth/google.js"
+                },
+                {
+                    "blank": 61,
+                    "code": 159,
+                    "comment": 52,
+                    "filename": "build/auth/test.auth.dropbox.js"
+                },
+                {
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0,
+                    "filename": "build/credentials.js"
+                },
+                {
+                    "blank": 0,
+                    "code": 11,
+                    "comment": 0,
+                    "filename": "build/credentials.json"
+                },
+                {
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0,
+                    "filename": "build/data/ContainsDownloadedFiles.txt"
+                },
+                {
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0,
+                    "filename": "build/fileManager.js"
+                },
+                {
+                    "blank": 4,
+                    "code": 17,
+                    "comment": 1,
+                    "filename": "build/filePartHandler.js"
+                },
+                {
+                    "filename": "build/logo192.png",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "filename": "build/logo512.png",
+                    "isbinaryfile": true,
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0
+                },
+                {
+                    "blank": 23,
+                    "code": 52,
+                    "comment": 22,
+                    "filename": "build/main.js"
+                },
+                {
+                    "blank": 0,
+                    "code": 25,
+                    "comment": 0,
+                    "filename": "build/manifest.json"
+                },
+                {
+                    "blank": 163,
+                    "code": 339,
+                    "comment": 140,
+                    "filename": "build/raidController.js"
+                },
+                {
+                    "blank": 0,
+                    "code": 3,
+                    "comment": 1,
+                    "filename": "build/robots.txt"
+                },
+                {
+                    "blank": 33,
+                    "code": 88,
+                    "comment": 3,
+                    "filename": "build/style.css"
+                },
+                {
+                    "blank": 0,
+                    "code": 0,
+                    "comment": 0,
+                    "filename": "build/tree.txt"
+                },
+                {
+                    "blank": 0,
+                    "code": 17841,
+                    "comment": 0,
+                    "filename": "package-lock.json"
+                },
+                {
+                    "blank": 3,
+                    "code": 61,
+                    "comment": 0,
+                    "filename": "package.json"
+                },
+                {
+                    "blank": 0,
+                    "code": 1,
+                    "comment": 0,
+                    "filename": "partitionDB.json"
+                },
+                {
+                    "blank": 0,
+                    "code": 1,
+                    "comment": 0,
+                    "filename": "partitions.json"
+                },
+                {
+                    "blank": 9,
+                    "code": 13,
+                    "comment": 0,
+                    "filename": "public/index.html"
+                },
+                {
+                    "blank": 0,
+                    "code": 25,
+                    "comment": 0,
+                    "filename": "public/manifest.json"
+                },
+                {
+                    "blank": 0,
+                    "code": 3,
+                    "comment": 1,
+                    "filename": "public/robots.txt"
+                },
+                {
+                    "blank": 58,
+                    "code": 358,
+                    "comment": 9,
+                    "filename": "public/style.css"
+                },
+                {
+                    "blank": 36,
+                    "code": 42,
+                    "comment": 12,
+                    "filename": "README.md"
+                },
+                {
+                    "blank": 5,
+                    "code": 33,
+                    "comment": 0,
+                    "filename": "src/App.css"
+                },
+                {
+                    "blank": 15,
+                    "code": 83,
+                    "comment": 1,
+                    "filename": "src/App.js"
+                },
+                {
+                    "blank": 5,
+                    "code": 10,
+                    "comment": 5,
+                    "filename": "src/auth/authController.js"
+                },
+                {
+                    "blank": 37,
+                    "code": 185,
+                    "comment": 15,
+                    "filename": "src/auth/dropboxAuth.js"
+                },
+                {
+                    "blank": 63,
+                    "code": 317,
+                    "comment": 73,
+                    "filename": "src/auth/googleAuth.js"
+                },
+                {
+                    "blank": 9,
+                    "code": 43,
+                    "comment": 3,
+                    "filename": "src/auth/onedriveAuth.js"
+                },
+                {
+                    "blank": 43,
+                    "code": 219,
+                    "comment": 43,
+                    "filename": "src/auth/redundant/auth.js"
+                },
+                {
+                    "blank": 0,
+                    "code": 11,
+                    "comment": 0,
+                    "filename": "src/auth/redundant/credentials.json"
+                },
+                {
+                    "blank": 73,
+                    "code": 145,
+                    "comment": 54,
+                    "filename": "src/auth/redundant/dropbox.js"
+                },
+                {
+                    "blank": 110,
+                    "code": 275,
+                    "comment": 56,
+                    "filename": "src/auth/redundant/google.js"
+                },
+                {
+                    "blank": 23,
+                    "code": 25,
+                    "comment": 0,
+                    "filename": "src/components/ButtonBar.jsx"
+                },
+                {
+                    "blank": 37,
+                    "code": 95,
+                    "comment": 3,
+                    "filename": "src/components/DriveCapacity.jsx"
+                },
+                {
+                    "blank": 4,
+                    "code": 23,
+                    "comment": 6,
+                    "filename": "src/components/Dropzone.jsx"
+                },
+                {
+                    "blank": 15,
+                    "code": 41,
+                    "comment": 5,
+                    "filename": "src/components/File.jsx"
+                },
+                {
+                    "blank": 45,
+                    "code": 171,
+                    "comment": 12,
+                    "filename": "src/components/FileBrowser_Elements.jsx"
+                },
+                {
+                    "blank": 275,
+                    "code": 621,
+                    "comment": 255,
+                    "filename": "src/components/FilesBrowser.jsx"
+                },
+                {
+                    "blank": 6,
+                    "code": 9,
+                    "comment": 0,
+                    "filename": "src/components/Folder.jsx"
+                },
+                {
+                    "blank": 8,
+                    "code": 25,
+                    "comment": 0,
+                    "filename": "src/components/Navbar.jsx"
+                },
+                {
+                    "blank": 27,
+                    "code": 71,
+                    "comment": 0,
+                    "filename": "src/components/Sidebar.jsx"
+                },
+                {
+                    "blank": 5,
+                    "code": 22,
+                    "comment": 0,
+                    "filename": "src/components/UploadBtn.jsx"
+                },
+                {
+                    "blank": 6,
+                    "code": 18,
+                    "comment": 0,
+                    "filename": "src/components/UploadWindow.jsx"
+                },
+                {
+                    "blank": 1,
+                    "code": 2,
+                    "comment": 0,
+                    "filename": "src/Contexts/browserContentContext.js"
+                },
+                {
+                    "blank": 38,
+                    "code": 202,
+                    "comment": 74,
+                    "filename": "src/filePartHandler.js"
+                },
+                {
+                    "blank": 1,
+                    "code": 12,
+                    "comment": 0,
+                    "filename": "src/index.css"
+                },
+                {
+                    "blank": 1,
+                    "code": 10,
+                    "comment": 0,
+                    "filename": "src/index.js"
+                },
+                {
+                    "blank": 13,
+                    "code": 45,
+                    "comment": 14,
+                    "filename": "src/main.js"
+                },
+                {
+                    "blank": 70,
+                    "code": 278,
+                    "comment": 73,
+                    "filename": "src/raidController.js"
+                },
+                {
+                    "blank": 4,
+                    "code": 16,
+                    "comment": 4,
+                    "filename": "src/requestHandler.js"
+                },
+                {
+                    "blank": 0,
+                    "code": 1,
+                    "comment": 0,
+                    "filename": "tokens/dropbox-access-token.json"
+                },
+                {
+                    "blank": 0,
+                    "code": 1,
+                    "comment": 0,
+                    "filename": "tokens/googleDrive-access-token.json"
+                }
+            ]
         }
     ]
 }

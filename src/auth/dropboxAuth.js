@@ -103,7 +103,11 @@ class dropboxAuth {
         );
 
         if (parts.length === 0) return;
-        if (parts.length === 1 && (uploadType !== 2 || uploadType !== 3))
+        if (
+          parts.length === 1 &&
+          parseInt(uploadType) !== 2 &&
+          parseInt(uploadType) !== 3
+        )
           parts[0].name = fileInfo.name;
 
         fileInfo.path = this.findPath(file, targetInfo, mode);

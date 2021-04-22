@@ -161,7 +161,7 @@ class googleAuth {
         );
 
         if (parts.length === 0) return;
-        if (parts.length === 1 && (uploadType !== 2 || uploadType !== 3))
+        if (parts.length === 1 && uploadType !== 2 && uploadType !== 3)
           parts[0].name = fileInfo.name;
 
         fileInfo.parent = await this.findParent(file, targetInfo, mode);

@@ -1,3 +1,4 @@
+
 import React from "react"
 import { CodeSlash } from "react-bootstrap-icons"
 import Card from 'react-bootstrap/Card'
@@ -85,8 +86,8 @@ function optionMenu(folder) {
             </button>
             <ul class="dropdown-menu">
             <li><button className="dropdownButton" style={{}} onClick={(e)=> {e.stopPropagation(); deleteItem(folder)} }>Delete</button></li>
-            <li><button className="dropdownButton" onClick={(e)=>e.stopPropagation()}>View Details</button></li>
-            <li><button className="dropdownButton" onClick={(e)=>e.stopPropagation()}>Download</button></li>
+            <li><button className="dropdownButton" onClick={(e)=>{e.stopPropagation(); showDetailToggle()}}>View Details</button></li>
+            <li><button className="dropdownButton" onClick={(e)=>{e.stopPropagation(); downloadItem(folder)}}>Download</button></li>
             </ul>
             </div>
         </div>
@@ -94,9 +95,19 @@ function optionMenu(folder) {
     )
 }
 
+function downloadItem() {
+    // send message to backend to download this
+}
+
+function showDetailToggle() {
+    // toggle visibilty of detail div
+}
+
 function deleteItem(item)
  {
     console.log("delete", item)
+    //add to folder named "rubbish"
+    // just mark as rubbish = hidden
  }
 export function FilesBrowser_Files(props) {
     const 
