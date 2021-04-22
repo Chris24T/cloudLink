@@ -4,7 +4,7 @@ npm run react-start
 
 # Start electron app
 
-npm run electron app
+npm run electron-start
 
 # Getting Started with Create React App
 
