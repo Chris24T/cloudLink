@@ -3,6 +3,7 @@ const readline = require("readline");
 
 const { google } = require("googleapis");
 const { file } = require("googleapis/build/src/apis/file");
+const { FileSlides } = require("react-bootstrap-icons");
 
 const CLIENT_ID = process.env.GOOGLE_AUTH_CLIENT_ID,
   CLIENT_SECRET = process.env.GOOGLE_AUTH_CLIENT_SECRET,
@@ -130,7 +131,7 @@ class googleAuth {
 
   deleteFiles(files) {
     if (files.length === 0) return;
-    console.log("attempting to delte", files);
+    console.log("GGL: attempting to delete", files.length, " files");
     this.authorize((client) => {
       files.forEach((file) => {
         _deleteFile(client, file);
@@ -139,6 +140,23 @@ class googleAuth {
 
     function _deleteFile(client, [name, id]) {
       const resp = client.files.delete({ fileId: id[0] });
+    }
+  }
+
+  renameFiles(files) {
+    if (files.length === 0) return;
+    console.log("GGL: attempting to rename ", files.length, " files");
+    this.authorize((client) => {
+      files.forEach((file) => {
+        _renameFile(client, file);
+      });
+    });
+
+    function _renameFile(client, [id, name]) {
+      const resp = client.files.update({
+        resource: { name },
+        fileId: id[0],
+      });
     }
   }
 
@@ -234,8 +252,8 @@ class googleAuth {
 
       //* exisitng data -> existing containing folder
       //* else create it
-      console.log("GGL: Stripe dropped Container", droppedContainer);
-      console.log("GGL: Stripe Existing Data", existingFileData);
+      //console.log("GGL: Stripe dropped Container", droppedContainer);
+      //console.log("GGL: Stripe Existing Data", existingFileData);
       if (existingFileData.parts[vID]) {
         pID = existingFileData.container.mergedIDs[vID][0];
       } else {

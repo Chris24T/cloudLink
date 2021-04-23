@@ -128,18 +128,18 @@ function FilesBrowser(prps) {
 		const partition = allFiles[partitionName]
 		uploadType = partition.partitionConfig.fulfillmentValue[0].mode.uploadType
 		const searchFolder = allFiles[directoryStack[directoryStack.length-1][0]]
-		_compare(toFind, /*partition*/ searchFolder)
+		_search(toFind, /*partition*/ searchFolder)
 
       } else {
         // not in partition, must search unpartitioned folder children (top level only) for a copy
 
         const partition = allFiles["p_Unpartitioned Files"]
-        _compare(toFind, partition)
+        _search(toFind, partition)
 	}
 
 	return existingData
 
-      function _compare(files, container, r=0) {
+      function _search(files, container, r=0) {
 		
         for( const findFile of files) {
 			const info = {name:findFile.name, path:findFile.path, size:findFile.size}
@@ -178,7 +178,7 @@ function FilesBrowser(prps) {
 							for(const part of Object.values(partContainer.children)) {
 								for(const [driveName, IDset] of Object.entries(part.mergedIDs)) {
 									existingData[findFile.name].existingFileData.parts[driveName] =  existingData[findFile.name].existingFileData.parts[driveName] || []
-									existingData[findFile.name].existingFileData.parts[driveName].push([part.name, IDset])
+									existingData[findFile.name].existingFileData.parts[driveName].push([part.name, IDset, part.path])
 								}
 							}
 
@@ -189,7 +189,7 @@ function FilesBrowser(prps) {
 				if(r && existingFile.isFolder) {
 				//recursive
 					container = files[existingFile.name] 
-					_compare(files, container, 1)
+					_search(files, container, 1)
 				}
 
 			}

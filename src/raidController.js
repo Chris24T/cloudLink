@@ -45,6 +45,7 @@ class raidController {
 
       callClients((clientId, client) => {
         // upload new data - edits
+        console.log("RC: todelete", toDeleteParts);
         client.deleteFiles(toDeleteParts[clientId]);
 
         //timeout for api rate limits
@@ -56,6 +57,10 @@ class raidController {
             mode
           );
         }, 1000);
+
+        setTimeout(() => {
+          client.renameFiles(toRenameParts[clientId]);
+        }, 2000);
 
         //rename parts to retain correct parts ordering
         //client.renameFiles([{fileInfo:file, parts:toRenameParts[clientId]}], targetInfo)

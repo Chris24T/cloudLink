@@ -71,6 +71,7 @@ class dropboxAuth {
   deleteFiles(files) {
     let partCounter = 0;
     if (files.length === 0) return;
+    console.log("DBX: attempting to delete ", files.length, " files");
     this.authorize((client) => {
       files.forEach((file) => {
         _deleteFile(client, file);
@@ -84,6 +85,28 @@ class dropboxAuth {
         },
         (err) => console.log(err)
       );
+    }
+  }
+
+  renameFiles(files) {
+    if (files.length === 0) return;
+    console.log("DBX: attempting to rename ", files.length, " files");
+    this.authorize((client) => {
+      files.forEach((file) => {
+        const [id, name, newName, path] = file;
+        const split = path.split("/");
+        const newPath =
+          split.slize(0, split.length - 2).join("/") + "/" + newName;
+
+        _renameFile(client, [path, newPath]);
+      });
+    });
+
+    function _renameFile(client, [from_path, to_path]) {
+      const resp = client.filesMove({
+        from_path,
+        to_path,
+      });
     }
   }
 

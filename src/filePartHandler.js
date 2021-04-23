@@ -112,102 +112,8 @@ class filePartHandler {
       } else if (existingFileData && isSmart) {
         console.log("recveriong");
         //recovery
-        recovery.call(this);
+        await recovery.call(this);
         return [toUpload, toDelete, toRename];
-
-        console.log("PH: INITATING RECOVERY");
-
-        while (offset < size) {
-          // Generate a (single) New part
-
-          const newPart = (
-            await this.chunkBetween(path, {
-              start: offset,
-              end: offset + chunkSize,
-              chunkSize,
-              counter: partCounter,
-            })
-          )[0];
-
-          if (offset === 0) console.log("first chunk:", newPart.name);
-          //if(offset === 2000) console.log("next match", newPart.name)
-
-          //test new part against existing parts
-          for (const [clientID, clientData] of Object.entries(
-            existingFileData.parts
-          )) {
-            for (const [partName, partId] of clientData) {
-              // console.log(
-              //   "PH-Checking Part: Existing vs New",
-              //   partName,
-              //   newPart.name
-              // );
-              // if (offset === 0)
-              //   console.log("first chunk, existing:", newPart.name, partName);
-              if (partName.includes(newPart.name.split("||")[0])) {
-                //found hash match
-
-                console.log(
-                  "PH: Found Hash Match:",
-                  newPart.name.split("||")[0]
-                );
-                //need to chunk everything that was not matched before this match
-                // console.log(
-                //   "BackCHunking start end chunksize",
-                //   lastMatchOffset,
-                //   offset,
-                //   chunkSize
-                // );
-
-                const fileParts = await this.chunkBetween(path, {
-                  start: lastMatchOffset + 1, // starting at last match - chunk all data before current postition but after the last match
-                  end: offset - chunkSize, //ending at current position
-                  chunkSize,
-                  partCounter,
-                });
-
-                console.log("edited regions", fileParts);
-
-                // skip over duplicate (matched) chunk
-                offset += chunkSize - 1;
-                // rember terminal offset of last match location (from end of chunk)
-                lastMatchOffset = offset;
-                // found an (existing) part, so must inc part counter
-                partCounter++;
-
-                // console.log(
-                //   "update offset, lastmatch",
-                //   offset,
-                //   lastMatchOffset
-                // );
-
-                if (parseInt(partName.split("_")[1]) !== partCounter) {
-                  //push to toRename
-                  const partNameChecksum = partName.split("_")[0];
-                  toRename[clientID].push([
-                    partNameChecksum + "_" + partCounter,
-                    partId,
-                  ]);
-                } else {
-                  //else dont have to push this matched part - do nothing with this part
-                }
-
-                //distribute new chunks to toUpload
-                // fileParts.forEach((part) => {
-                //   for (const vendor of vendorList) {
-                //     toUpload[vendor].push(part);
-                //   }
-                // });
-              } else {
-                //No match, try very next chunk (at offset+1)
-                if (offset === 0) console.log("inc offset");
-              }
-            }
-          }
-          offset += step;
-        }
-
-        //need to build toDelete here
       }
     } else if (parseInt(uploadType) === 3) {
       //mirror stripe - upload as split file, to all connected drives (copied), delete existing parts if not smart
@@ -425,6 +331,7 @@ class filePartHandler {
     async function recovery() {
       console.log("PH: INITATING RECOVERY");
       let isFound = false;
+      let foundParts = JSON.parse(JSON.stringify(toDelete));
       while (offset < size) {
         isFound = false;
 
@@ -441,27 +348,28 @@ class filePartHandler {
         const newPartChecksum = newPart.name.split("||")[0];
 
         //loop through existing parts
+        //NB: partId is actually a keyring array (.mergedIds)
 
         for (const [clientId, clientData] of Object.entries(
           existingFileData.parts
         )) {
-          for (const [partName, partId] of clientData) {
+          for (const [partName, partId, dbxpath] of clientData) {
+            //! path used only for dropbox rename
             if (partName.includes(newPartChecksum)) {
               isFound = true;
-
+              foundParts[clientId].push(partId[0]);
               console.log("Hash Match Found");
+
               //need to recover edited regions now
 
               const editedRegionParts = await this.chunkBetween(path, {
-                start: lastMatchOffset, //start offset found in previous chunk, so +1?
-                end: offset, //end offset found in next chunk, so -1?
+                start: lastMatchOffset + 1, //start offset found in previous chunk, so +1?
+                end: offset - 1, //end offset found in next chunk, so -1?
                 chunkSize,
                 counter: partCounter,
               });
 
               partCounter += editedRegionParts.length;
-
-              partCounter += 1;
 
               //console.log("Edited Region", await editedRegionParts);
 
@@ -474,11 +382,12 @@ class filePartHandler {
                 }
               });
 
-              if (partName.split("||")[1] !== partCounter) {
+              if (parseInt(partName.split("||")[1]) !== partCounter) {
                 const newName = newPartChecksum + "||" + partCounter;
-                toRename[clientId].push([partId, newName]);
+                toRename[clientId].push([partId, newName, partName, dbxpath]);
               }
 
+              partCounter += 1;
               lastMatchOffset = offset + chunkSize;
 
               //edited regions go to toUpload
@@ -491,6 +400,19 @@ class filePartHandler {
         offset += isFound ? chunkSize : 1;
         //partCounter += isFound ? 1 : 0;
       }
+
+      //go through parts again, those not in "foundParts" need to be deleted
+      for (const [clientId, clientData] of Object.entries(
+        existingFileData.parts
+      )) {
+        for (const [partName, partId] of clientData) {
+          if (!foundParts[clientId].includes(partId[0])) {
+            toDelete[clientId].push([partName, partId]);
+          }
+        }
+      }
+      console.log("delete", toDelete);
+      return;
     }
   }
 
@@ -505,12 +427,12 @@ class filePartHandler {
     while (offset < end) {
       const content = fs.createReadStream(path, {
           start: offset,
-          end: offset + chunkSize + 1,
+          end: offset + chunkSize > end ? end : offset + chunkSize,
         }),
         contentChecksum = await this.genContentHash(
           fs.createReadStream(path, {
             start: offset,
-            end: offset + chunkSize + 1,
+            end: offset + chunkSize > end ? end : offset + chunkSize,
           })
         );
 
@@ -519,7 +441,7 @@ class filePartHandler {
       part.name = contentChecksum + "||" + counter++;
       part.checksum = contentChecksum;
       part.content = content;
-      part.size = offset + chunkSize + 1;
+      part.size = offset + chunkSize > end ? end - offset : offset + chunkSize;
       // if (offset % chunkSize === 0)
       //   console.log("offset end chunksize", offset, end, chunkSize);
       //console.log("builtPart at offset end chunksize ", offset, end, chunkSize);
