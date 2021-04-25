@@ -57,8 +57,14 @@ const init = () => {
 
   ipcMain.on("FileBrowser-Usage-Request", async (e, messageContent) => {
     const response = await handleRequest(messageContent);
-    console.log("got reqest");
+
     return e.reply("FileBrowser-Usage-Response", JSON.stringify(response));
+  });
+
+  ipcMain.on("FileBrowser-Download-Request", async (e, messageContent) => {
+    const response = await handleRequest(messageContent);
+
+    return e.reply("FileBrowser-Download-Response", JSON.stringify(response));
   });
 
   ipcMain.on("shutdown", async (e, messageContent) => {

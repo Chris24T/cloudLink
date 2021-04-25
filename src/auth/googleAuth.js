@@ -19,7 +19,7 @@ class googleAuth {
     this.vendor = VENDOR_NAME;
   }
 
-  async authorize(callback) {
+  authorize(callback) {
     //Generate oAuth2Client
     const oAuth2Client = new google.auth.OAuth2(
       CLIENT_ID,
@@ -329,68 +329,58 @@ class googleAuth {
 
   //TODO
   downloadFiles(files, mode) {
-    console.log("GGL - Initiating Download of [", files.length, "] files");
-
-    let fileCounter = 1,
-      partCounter = 1;
-
-    this.authorize((client) => {
-      files.forEach(({ file, parts }) => {
-        console.log(
-          "Downloading File",
-          file.name,
-          "of ",
-          parts.length,
-          " parts | File Position in Queue: [",
-          fileCounter,
-          "/",
-          files.length,
-          "]"
-        );
-        parts.forEach((partId) => {
-          console.log(
-            "Initiating Download | Part Position in Queue [",
-            partCounter,
-            "/",
-            parts.length,
-            "]"
-          );
-          _downloadFile(client, file, partId, partCounter);
-          partCounter++;
-        });
-        fileCounter++;
-        partCounter = 1;
+    console.log("GGL - Initiating ", files.length, " Downloads");
+    return new Promise((resolve) => {
+      this.authorize((client) => {
+        let responses = [];
+        for (const [partPos, partId] of files) {
+          const download = _downloadFile(client, partId);
+          responses[partPos] = download;
+        }
+        resolve(responses);
       });
     });
 
-    function _downloadFile(client, file, fileId, pNum) {
-      const dest = fs.createWriteStream(DOWNLOADS_DIR + "/" + fileId);
+    async function _downloadFile(client, fileId) {
+      // const dest = fs.createWriteStream("./googlePipe.txt", { flags: "a" });
 
-      client.files
-        .get(
-          {
-            fileId,
-            alt: "media",
-          },
-          {
-            responseType: "stream",
-          }
-        )
-        .on("data", (data) => {
-          console.log("download Progress++", data);
-        })
-        .on("end", () => {
-          console.log(
-            "Part ",
-            fileId,
-            " Download Success | See ",
-            DOWNLOADS_DIR
-          );
-        })
-        .on("error", (err) => {
-          console.log("File ", file.name, " Part Download Failure:", err);
-        })
-        .pipe(dest);
+      const resp = client.files.get(
+        {
+          fileId,
+          alt: "media",
+        },
+        {
+          responseType: "stream",
+        }
+      );
+      return resp.then((val) => {
+        //console.log("GGL RESP:", val);
+        return val.data;
+      });
+
+      return resp;
+      // .on("end", function () {
+      //   console.log("Done");
+      // })
+      // .on("error", function (err) {
+      //   console.log("Error during download", err);
+      // })
+      // .pipe(dest);
+      // .on("data", (data) => {
+      //   console.log("download Progress++", data);
+      // })
+      // .on("end", () => {
+      //   console.log(
+      //     "Part ",
+      //     fileId,
+      //     " Download Success | See ",
+      //     DOWNLOADS_DIR
+      //   );
+      // })
+      // .on("error", (err) => {
+      //   console.log("File ", file.name, " Part Download Failure:", err);
+      // })
+      // .pipe(dest);
     }
   }
 

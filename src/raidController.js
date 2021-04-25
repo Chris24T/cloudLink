@@ -21,6 +21,54 @@ class raidController {
     };
   }
 
+  downloadFiles(params, files) {
+    console.log("Download Request:", files);
+
+    //parts need their order part:[positoin, id]
+    files.forEach(({ fileInfo, partSources }) => {
+      let responses = [];
+      callClients((clientId, client) => {
+        responses.push(client.downloadFiles(partSources[clientId]));
+        // responses = [
+        //   ...responses,
+        //   ...client.downloadFiles(partSources[clientId]),
+        // ];
+        // console.log(
+        //   "client response ",
+        //   clientId,
+
+        // );
+      });
+
+      Promise.all(responses).then((driveResponses) => {
+        let combinedResponse = [];
+
+        driveResponses.forEach((response) => {
+          response.forEach((part, i) => {
+            if (part) {
+              combinedResponse[i] = part;
+            }
+          });
+        });
+
+        Promise.all(combinedResponse).then((streams) => {
+          const writable = fs.createWriteStream("./" + fileInfo.name, {
+            emitClose: true,
+            autoClose: true,
+          });
+
+          streams.forEach((partContent, i) => {
+            console.log("part ", i, " merged");
+            partContent.pipe(writable);
+          });
+        });
+        //should be in order already
+        //just need to pipe to same write stream
+        //use fileInfo here to get file name (and type)
+      });
+    });
+  }
+
   /**
    *
    * @param {*} Object contains upload config e.g stripe + smart and info about target (upload dir - the parent)

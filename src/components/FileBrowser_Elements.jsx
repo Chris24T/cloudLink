@@ -1,8 +1,11 @@
 
-import React from "react"
+import React, {useContext} from "react"
 import { CodeSlash } from "react-bootstrap-icons"
 import Card from 'react-bootstrap/Card'
 import ButtonBar from "./ButtonBar"
+import {browserContentContext } from "../Contexts/browserContentContext"
+const { ipcRenderer} = window.require('electron');
+
 
 const drivesStyle = {
     "google":{
@@ -39,6 +42,8 @@ export function FilesBrowser_PWD(props) {
 }
 
 export function FilesBrowser_Folders(props) {
+    const {allFiles:fileTree} = useContext(browserContentContext)
+
     const 
     {folders, isPartitionLevel} = props.fd,
     folderFuncs = props.fdfunc
@@ -59,7 +64,7 @@ export function FilesBrowser_Folders(props) {
                 <div    onClick={
                             () => folderFuncs.onClickChild("fwd", [folder.name, folder.mergedIDs])} 
                         className="folder" key={folder.id} >
-                            {optionMenu(folder)}
+                            {optionMenu(fileTree.current, folder)}
                             {originDisplay(folder)}            
                     <span>{folder.displayName || folder.name} </span>
                 </div>
@@ -74,7 +79,7 @@ export function FilesBrowser_Folders(props) {
 
 }
 
-function optionMenu(folder) {
+function optionMenu(fileTree, resource) {
     return (
         <div className="detailButton" style={{ position:"absolute", left:"0%", top:"0px", padding :"0px", margin:"0px"}}>
             
@@ -85,9 +90,9 @@ function optionMenu(folder) {
                 </svg>
             </button>
             <ul class="dropdown-menu">
-            <li><button className="dropdownButton" style={{}} onClick={(e)=> {e.stopPropagation(); deleteItem(folder)} }>Delete</button></li>
+            <li><button className="dropdownButton" style={{}} onClick={(e)=> {e.stopPropagation(); deleteItem(resource.isFolder, resource)} }>Delete</button></li>
             <li><button className="dropdownButton" onClick={(e)=>{e.stopPropagation(); showDetailToggle()}}>View Details</button></li>
-            <li><button className="dropdownButton" onClick={(e)=>{e.stopPropagation(); downloadItem(folder)}}>Download</button></li>
+            <li><button className="dropdownButton" onClick={(e)=>{e.stopPropagation(); downloadItem(fileTree, resource)}}>Download</button></li>
             </ul>
             </div>
         </div>
@@ -95,8 +100,69 @@ function optionMenu(folder) {
     )
 }
 
-function downloadItem() {
+function downloadItem(files, item) {
     // send message to backend to download this
+    let toDownload = {}
+
+    if(item.isFolder) {
+        const folder = files[item.name]
+        if(item.name.includes("__")) {
+            //part container
+            toDownload = {
+                fileInfo:item,
+                partSources: gatherParts(Object.entries(folder.children))
+            }
+
+            console.log("toDownlaod", toDownload)
+            
+        } else {
+            //normal folder - just pass folder ID and path
+            // can download by folder in api (better than recursively downloading contents)
+        }
+    } else {
+        //just a file, return id for download
+    }
+
+    const requestBody = {
+        data:[toDownload]
+    }
+
+    const request = {
+        requestType:"fileDownload-request",
+        requestBody
+    }
+    console.log("sending request", request)
+    ipcRenderer.send("FileBrowser-Download-Request", [request])
+
+    //renderer send download request
+    //payload of "toDownload"
+        
+
+    console.log(files[item.name])
+    console.log(item)
+    // if(isFolder && name.includes("__")) {
+        //have container folder
+        //need to get its children name and id
+        // use name to get positoin
+
+
+    //}
+
+   function gatherParts(parts) {
+    const container = {}
+
+    parts.forEach(( [partName, part] )=> {
+        const position = partName.split("||")[1]
+        Object.entries(part.mergedIDs).forEach(([vendorId, IDSet]) => {
+            container[vendorId] = container[vendorId] || []
+            container[vendorId].push([position, IDSet[0]])
+        }) 
+    })
+
+    return container
+   }
+
+
 }
 
 function showDetailToggle() {

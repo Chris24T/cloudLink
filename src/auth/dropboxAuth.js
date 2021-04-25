@@ -3,7 +3,7 @@ const fs = require("fs");
 const { Dropbox } = require("dropbox");
 const { file } = require("googleapis/build/src/apis/file");
 const fetch = require("node-fetch");
-const { isCompositeComponent } = require("react-dom/test-utils");
+const { Readable } = require("stream");
 
 const CLIENT_ID = process.env.DROPBOX_AUTH_CLIENT_ID,
   CLIENT_SECRET = process.env.DROPBOX_AUTH_CLIENT_SECRET,
@@ -162,9 +162,35 @@ class dropboxAuth {
     }
   }
 
-  downloadFiles() {
-    function _downloadFile() {}
+  downloadFiles(files) {
+    console.log("DBX - Initiating ", file.length, " Downloads");
+    return new Promise((resolve) => {
+      this.authorize((client) => {
+        let responses = [];
+        for (const [partPos, partId] of files) {
+          responses[partPos] = _downloadFile(client, partId);
+        }
+        resolve(responses);
+      });
+    });
+
+    async function _downloadFile(client, fileId) {
+      // const dest = fs.createWriteStream("./dropboxPipe.txt");
+      const resp = client.filesDownload({
+        path: fileId,
+      });
+
+      return resp.then((val) => {
+        return Readable.from(val.result.fileBinary);
+      });
+
+      // return resp;
+      // //resp.result
+    }
   }
+
+  //is zipped
+  downloadFolder() {}
 
   getSpaceUsage() {
     const resp = this.authorize((client) => {
