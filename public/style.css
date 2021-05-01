@@ -56,14 +56,29 @@
   resize: none;
   width: 150px;
   height: 200px;
-  background-color: lightblue;
+  background-color: rgb(230, 230, 230);
   word-wrap: break-word;
+
   order: 2;
   float: left;
   margin: 5px;
   font-size: smaller;
   position: relative;
   text-align: center;
+  border-radius: 5px;
+  border-style: solid;
+  border-width: 1px;
+  border-color: rgb(187, 187, 187);
+}
+
+.File > .File-Thumbnail {
+  background-color: rgb(230, 230, 230);
+}
+
+.File > .File-Title {
+  position: absolute;
+  top: 75%;
+  width: 100%;
 }
 
 .FB-Files {
@@ -244,7 +259,7 @@ meter {
   height: 100px;
   width: 100%;
   bottom: 0px;
-  background-color: gray;
+  background-color: none;
 }
 
 .connectedDrives {
@@ -365,6 +380,36 @@ meter {
 
 #Navbar .navbtn:hover {
   color: #f1f1f1;
+}
+
+.detailBox {
+  position: absolute;
+
+  bottom: 0px;
+  width: 100%;
+
+  padding-top: 15px;
+  height: 75%;
+
+  transition: 0.25s;
+  overflow: hidden;
+}
+
+.partition {
+  height: 180px;
+}
+
+.folder > h6 {
+  position: relative;
+  margin-top: 25px;
+}
+
+h6::after {
+  content: "";
+  width: 100%;
+  height: 1px;
+  background-color: #636e72;
+  z-index: 11;
 }
 
 #capBox {

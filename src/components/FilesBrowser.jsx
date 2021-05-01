@@ -25,10 +25,11 @@ const CHANNEL_NAME_RES = 'FileBrowser-Render-Response';
 
 function FilesBrowser(prps) {
 
-    const {dirStack, convertUnits, setCurrentFolderSize, currentFolderSize,usageStatistics:usage, allFiles:fileTree, displayFiles:displayedFiles, setDisplayFiles, activePartition=true} = useContext(browserContentContext)
+    const {dirStack, onGoingDownloads, onGoingUploads, convertUnits, globalUsage, setCurrentFolderSize, currentFolderSize,usageStatistics:usage, allFiles:fileTree, displayFiles:displayedFiles, setDisplayFiles, activePartition=true} = useContext(browserContentContext)
     const [displayMode, setDisplayMode] = useState("advanced")
     const [displayForm, setDisplayForm] = useState(true)
-
+    const [viewDetailModel, setViewDetailModal] = useState(true)
+    
     let
     //[displayedFiles, setDisplayedFiles] = useState([]), //all handling meta data, only handle reall data at donwload or upload (not read)
     
@@ -50,7 +51,7 @@ function FilesBrowser(prps) {
     useEffect(() => {
       console.log("init render")      
       const intvl = updateLoop()      
-      clearInterval(intvl) //disables drive polling
+      //clearInterval(intvl) //disables drive polling
       
     
     },[])
@@ -69,12 +70,12 @@ function FilesBrowser(prps) {
       let usage = []
 
       if(dStack.length > 1 && !currentDirName.includes("Unpartitioned")) {
-        console.log("dstacj", dStack)
+        //console.log("dstacj", dStack)
         const partitionName = dStack[1][0]
-        console.log("parition", fileTree.current[partitionName])
+        //console.log("parition", fileTree.current[partitionName])
         const partitionLimits = fileTree.current[partitionName].partitionConfig.fulfillmentValue[0].targets
         const capacity = getFolderSize(partitionName)
-        console.log(partitionLimits)
+        //console.log(partitionLimits)
         usage = [[(partitionLimits["google"]?.limit) || -1, (capacity.google)||-1], [(partitionLimits["dropbox"]?.limit) || -1, (capacity?.dropbox || -1)]]
         
       } else {
@@ -84,10 +85,10 @@ function FilesBrowser(prps) {
 
       
       
-      console.log("usage", usage)
+      //console.log("usage", usage)
       //setCurrentFolderSize([google, dropbox])
       setCurrentFolderSize(usage)
-    }, [dirStack.current.length])
+    }, [dirStack.current.length < 2])
     
     function findForeignFolders() {
       const foreignFolders = {}
@@ -105,14 +106,14 @@ function FilesBrowser(prps) {
     
     // need to return which folder specifically it exists in - append item to path (dirstack)
     //currently returning contianign folder as if target were a file, but a file can exist as a fodler itself, i need THAT fodler
-    function findExistingFileData(toFind) {
+    function findExistingFileData(toFind, simDir) {
       //default search space is global search space - recursive almost
       // want to change to currentDir
       
       // want to find existing existing data 
       // am looking for parts - mode will decide whether to look for "__name" folder or just "name" file 
 
-      const directoryStack = dirStack.current
+      const directoryStack = simDir || dirStack.current
       const allFiles = fileTree.current
 	  
 	  let uploadType = 0
@@ -199,146 +200,63 @@ function FilesBrowser(prps) {
 	  return existingData
 
         
-    //  	files = []
-	// 	  //const {uploadType, isSmart} = mode
-    //   for( const item of toFind ) {
-	// 	    const clipName =  item.name.split(".").slice(0, -1).join(".")
-    //     let fileData = {}
-	// 	    console.log("f",Object.entries(foreignFolders))
-	// 	//search foreign folders for data
-	// 	for(const [clietnId, foreignRef] of Object.entries(foreignFolders)) {
-
-	// 		console.log(foreignRef)
-	// 		const foreignFolder = fileTree.current[foreignRef[1]]
-	// 		console.log("foreign", foreignFolder)
-	// 		for( const folder of Object.values(foreignFolder.children)) {
-
-	// 			if(folder.name.includes("__"+/*clipName*/item.name)) {
-	// 				console.log("Containing Folder Found in current foreign:",folder)
-	// 				const container = fileTree.current[folder.id]
-	// 				fileData[container.origin] = ({
-	// 					containingFolder:[container.name, container.id, container.origin],
-	// 					parts:container.children
-	// 				})
-	// 			}
-	// 		}
-	// 	}
-
-	// 	// search local dir for data
-    //     for(const resource of Object.values(searchSpace)) {
-			
-    //       // found target part-container
-    //       if(resource.name.includes("__"+clipName) && resource.isFolder && (uploadType===2 || isSmart)) {
-    //           console.log("Containing Folder Found in current DIR:",resource)
-	// 		  const container = fileTree.current[resource.id]
-    //           fileData[resource.origin] = ({
-    //             containingFolder:[container.name, container.id, container.origin],
-    //             parts: container.children
-    //           })
-			  
-    //       }
-
-    //       //found simple/standard upload copy
-    //       if(resource.name === item.name && (!resource.isFolder) && (uploadType===0 || uploadType===1)) {
-	// 		console.log("Simple Copy Found:", resource)
-	// 		const id = resource.id
-	// 		const [dStr, dId] = dirStack.current[dirStack.current.length - 1]
-	// 		fileData[resource.origin] = ({
-	// 			containingFolder:[dStr, dId], // exists at end of dirStack
-	// 			parts: {[id]:resource}
-	// 		})
-			
-
-    //       }
-
-	// 	  // must keep going through entire search space, make sure found all copies
-    //     }
-       
-    //     if(Object.keys(fileData).length === 0) {          
-    //       fileData = false          
-    //     }
-        
-    //     item.existingFileData = fileData
-    //     files.push(item)
-
-    //   }
-
-    //   return files
-
-      /**
-       * return: [files, foreign folders]
-       * 
-       * files:         file: 
-       *    [ {file1},     {  "google":{containingFolder[], parts{}}
-       *      {file2},        "dropbox":{containingFolder[], parts{}}
-       *      {file3}      }
-       *    ]               
-       * 
-       * * NB: Foreign folder parent always Root
-       * foreignFolders: 
-       * {
-       *  "google":[str, id, origin="google"]
-       *  "dropbox":[str, id, origin="dropbox"]
-       * }
-       * 
-      */
 
     }
 
+    function partitionHasSpace(files) {
+      //if total size of files is too big, dont allow
+      console.log("dile", files)
+      let toUploadBytes = files.reduce( (acc, el) => {
+        acc += el.size || 0
+        return acc
+      }, 0)
+
+
+      if(dirStack.current.length > 1) {
+      const partitionName = dirStack.current[1][0]
+      const partitionCFG = fileTree.current[partitionName].partitionConfig.fulfillmentValue[0]
+
+      const partitionUsage = Object.values(getFolderSize(partitionName)).reduce( (acc, el) => {
+        acc += parseInt(el)
+        return acc
+      }, 0)
+      //console.log("pusage ", partitionUsage)
+      const partitionLimit = getPartitionLimit(partitionCFG)
+      //console.log("plimit", partitionLimit)
+      //console.log("uploadingBytes", toUploadBytes, "remaining", partitionLimit - partitionUsage)
+      if(toUploadBytes < (partitionLimit - partitionUsage)) return true
+      else return false
+      
+      }
+
+      
+    }
+
+    function getPartitionLimit(cfg) {
+      return Object.values(cfg.targets).reduce( (acc, el) => {
+        
+        const {limit} = el
+        acc += limit
+        return acc
+      }, 0)
+    }
+
+    const simOnDrop = ( (fileInfo, partitionInfo, targetInfo) => {
+      console.log("tgt", targetInfo)
+      const toUpload = findExistingFileData([fileInfo], targetInfo.droppedPath)
+      
+      uploadFiles(toUpload, partitionInfo, targetInfo)
+    })
+
     const onDrop = useCallback ( (droppedFiles, rejected) => {
-      
-      
-      //Need to know: path/parentId of working dir and drive to uplaod to
-      
-      // identify if file already exists in displayed files-> reupload
-      // should probably be across all files, since dont want to produce two "foreign" files of same name 
-      //      e.g. (smart) upload two copies of same file to google: dbx foreign has now two copies of identical content
-      //      bad since versioning might be different -> cannot just keep one of them
-      // -> demands globally unique names rather than unique to current directory (latter is typical case)
-
-      // Above problem exists because: "foreign" folders(files) are named the file name only, cant distinguish between multiple copies of same file existing in "native"
-      // possible solution: 1 - globally unique names, 2 - append to repeat name "name+(copy)", 3 - create subfolder in native/filename, subfolder is named the parent - contains parts for the file in that parent
-      // 3 = best but pushed problem further e.g. two same files in two same parent folders...
-	// 	const cfg = config.current
-	//   const dStack = dirStack.current
-    // const currentDirId = dStack[dStack.length - 1][0]
-	//   console.log(currentDirId)
-    // const currentDir = fileTree.current[currentDirId].children
-	//   const foreignFolders = findForeignFolders()
-
 		const directory = dirStack.current
 		const partitionName = directory.length
 
     const toUpload = findExistingFileData(droppedFiles)
-	console.log("FB: Existing Data Result", toUpload)
-    uploadFiles(toUpload)  
-    })
-      
-      // // Extract paths
-      // let dirPath = dirStack.current
-      // let parentName = dirPath[-1] || dirPath[0] //parent if exists vs root
-
-      // droppedFiles.forEach( file => {
-      //   console.log(dirPath, parentName)  
-      //   //file.parent = parentDir
-      //   file.origin = "other"
-      // })     
-      
-      // uploadFiles(droppedFiles)
-      
-      // ? Need to return: enitre dirstack (string path for dbx, parentid for ggl)
-      // ? and the drive that the upload is being made to
-      // ? can identify if reupload here: check working directory for file of same name as is dropped
-
-      // ? extra: can recognise duplicate parts by name: query api for files of the same name
-      // ? else: possible to have duplicate data across files (and across drives)
-      
-    
-
- 
-    // const loc = useLocation()
-    // console.log("location", loc))
-    
+	  console.log("FB: Existing Data Result", toUpload)
+    if (partitionHasSpace(droppedFiles)) uploadFiles(toUpload)
+    else {console.log("Not Enough Space")}  
+    })    
 
     return (
       
@@ -370,7 +288,7 @@ function FilesBrowser(prps) {
     function TrashView() {
       return (
         <div id="FileBrowser-Container" >
-        <span >trashgggggggggggggggggggggggggggggggggggggggggggggggggggg</span>
+        <span >Trash Page - Under Construction</span>
         </div>
       )
     }
@@ -378,7 +296,7 @@ function FilesBrowser(prps) {
     function SettingsView() {
       return (
         <div id="FileBrowser-Container" >
-        <span >Seetings</span>
+        <span >Settings Page - Under Construction</span>
         </div>
       )
     }
@@ -386,12 +304,41 @@ function FilesBrowser(prps) {
     function DrivesView() {
       return (
         <div id="FileBrowser-Container" >
-          <span>drivey wivey</span>
+          <span>Drive Page - Under Construction</span>
         </div>
       )
     }
 
-    function formView(isPartition) {
+    function propsDetails() {
+      
+    }
+
+    function formMoreDetailView() {
+      return (
+        <div class="modal fade" id="moreDetailModel" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">Modal title</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary">Save changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+      )
+    }
+
+    function formCreateFolderView(isPartition) {
       //console.log("partigion", isPartition)
       const formType = isPartition ? " Partition" : " Folder"
       //isPartition ? "Create A Partition" : "Create A Folder"
@@ -411,7 +358,7 @@ function FilesBrowser(prps) {
 
         
 
-        <form id="createFolder" onSubmit={(e) => handleCreateFolderFormSubmit(e)}>
+        <form className="needs-validation" id="createFolder" onSubmit={(e) => handleCreateFolderFormSubmit(e)}>
 
                 {folderFormBody(formType)}
 
@@ -463,7 +410,8 @@ function FilesBrowser(prps) {
                 <label for={"Name Your New"+toCreateStr} class="form-label">{"Name Your "+toCreateStr+":"}</label>
                 </div>
                 <div class="col-7" >
-                <input type="text" class="form-control" id="folderName" placeholder={"My"+toCreateStr}/>
+                <input type="text" class="form-control" id="folderName" placeholder={"My"+toCreateStr} required/>
+                
                 </div>
               </div>
               
@@ -480,7 +428,7 @@ function FilesBrowser(prps) {
         
         const googleWidth = (Math.floor((100*(googleReserved||1)/driveusage?.google?.allocated||100))||1)+"%"
         const dropboxWidth =( Math.floor(( 100*(dropboxReserved||1)/driveusage?.dropbox?.allocated||100)) || 1)+"%"
-        console.log("width", googleWidth, dropboxWidth)
+        //console.log("width", googleWidth, dropboxWidth)
         const googleUsed =( driveusage?.google?.used||1)
         const dropboxUsed = (driveusage?.dropbox?.used)
         const googleAlloc = (driveusage?.google?.allocated||100)
@@ -542,33 +490,7 @@ function FilesBrowser(prps) {
               </div>
 
               </div>
-              {/*
-              <div className="row">
-
-              <div className="col-10 offset-1 pt-3">              
-                Allocation After Creation   
-              </div>            
-
-              </div>
-
-              <div className="row pt-2">
-
-              <div className="col-12 offset-3">
-              <div class="progress" id="allocationBar">
-                <div class="progress-bar" id="allocaltionBar-Google" role="progressbar" style={{width:"20%", backgroundColor:"yellow"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
-                <div class="progress-bar" id="allocationBar-Dropbox" role="progressbar" style={{width:"20%", backgroundColor:"blue"}} aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>
-                <div class="progress-bar" id="allocaltionBar-GoogleAddition" role="progressbar" style={{width:"20%", backgroundColor:"red"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
-                <div class="progress-bar" id="allocationBar-DropboxAddition" role="progressbar" style={{width:"20%", backgroundColor:"green"}} aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>
-                
-              </div>   
-              </div>
-
-              <div className="col-0 ">
-          
-              </div>
-
-              </div>
-              */}
+              
               
               <div className="row pt-4">
 
@@ -580,21 +502,24 @@ function FilesBrowser(prps) {
                 
                 <div className="col-7">
 
-                <select class="form-select" aria-label="Default select example">
-                <option selected>Partition RAID Type</option>
+                <select id="raidTypeSelect" class="form-select" aria-label="Default select example" required>
+                <option selected disabled value="">Partition RAID Type</option>
                 <option value="0">Span</option>
                 <option value="1">Mirror</option>
                 <option value="2">Stripe</option>
                 <option value="3">Mirror-Stripe</option>
                 <option value="4" disabled="true" >Parity (Not Yet Supported)</option>
               </select>
+              <div class="invalid-feedback">
+                Please select a valid state.
+              </div>
 
                 </div>
 
                 <div className="col-5">
 
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="1" id="flexCheckSmart"/>
+                  <input onChange={() => reflectChangeInForm("deltaButton")} class="form-check-input" type="checkbox" value="1" id="flexCheckSmart"/>
                   <label class="form-check-label" for="flexCheckDefault">
                     Enable Smarter Uploads
                   </label>
@@ -605,15 +530,64 @@ function FilesBrowser(prps) {
 
               </div>
 
+              <p style={{paddingTop:"5px"}}>
+              <button  onClick={() => toggleAdvOptions()} class="btn btn-primary btn-sm" type="button" data-toggle="collapse" data-target="#advOptions" aria-expanded="false" aria-controls="collapseExample">
+                Toggle More Settings
+              </button>
+              </p>
               
 
-              
+              <div class="collapse" id="advOptions">
+                <div class="card card-body">
+                <div class="input-group mb-3">
+                    <div style={{width:"100%"}}>Track Contents
+                    <input id="trackContents_input" style={{width:"50%"}} type="checkbox" /> 
+                    </div>                   
+                  </div>
+                  <div class="input-group mb-3">
+                    <div style={{width:"100%"}}>Target Segment Size</div>
+                    <input id="chunkSize_input" style={{width:"50%"}} type="number" class="form-control" max="256" min="1" placeholder="16" aria-label="Recipient's username" aria-describedby="basic-addon2" />
+                    <div style={{width:"50%"}} class="input-group-append">
+                      <span class="input-group-text" id="basic-addon2">KB</span>
+                    </div>
+                  </div>
+                  <div class="input-group mb-3">
+                  <div style={{width:"100%"}}>Recovery Density</div> 
+                    <input id="recoveryDensity_input" style={{width:"50%"}} max="100" min="1" type="number" class="form-control" placeholder="100" aria-label="Recipient's username" aria-describedby="basic-addon2" />
+                    <div style={{width:"50%"}} class="input-group-append">
+                      <span class="input-group-text" id="basic-addon2">%</span>
+                    </div>
+                  </div>                
+                </div>
+              </div>
 
+
+            
               
           </React.Fragment>  
         )
       }
       
+    }
+
+    function toggleAdvOptions() {
+      document.getElementById("advOptions").classList.toggle("collapse")
+      
+    }
+
+    function reflectChangeInForm(type) {
+      //if smart selected, set raid field to stripe if is not already
+
+      if(type === "deltaButton") {  
+        const element = document.getElementById("raidTypeSelect")
+        element.value = "2"
+      }
+
+      // all types can access multiple drives
+      // so no action needed on type change
+
+
+
     }
 
     function getReserved() {
@@ -623,7 +597,7 @@ function FilesBrowser(prps) {
 
       for (const folder of Object.values(fileTree.current)) {
         if(folder.isPartitionFolder) {
-          console.log("fold", folder)
+          
           googleReserved += parseInt(folder.partitionConfig?.fulfillmentValue[0].targets?.google?.limit || 0)
           dropboxReserved += parseInt(folder.partitionConfig?.fulfillmentValue[0].targets?.dropbox?.limit || 0)
         }
@@ -642,11 +616,16 @@ function FilesBrowser(prps) {
       document.getElementById("allocationBar-Google-Input").style.width = Math.floor((gglAlloc/googleTotal)*100)+"%"
       document.getElementById("allocationBar-Dropbox-Input").style.width = Math.floor((dbxAlloc/dropboxTotal)*100)+"%"
 
+      //flip parttiion type to span if not already chosen one
+
     }
 
   function HomeView({content, dirStack}) {
     //console.log("Rendering Content:", content)
     const {getRootProps, getInputProps, isDragActive} = useDropzone({onDrop})
+
+    const onGoingUploads = useRef([])
+    const onGoingDownloads = useRef([])
 
     // if(dirStack.current.length === 1) return (
     //   <div>
@@ -668,7 +647,12 @@ function FilesBrowser(prps) {
             //isDragActive ? <p>drop here</p> : <p>drag and drop a file anywhere to upload</p>
             // set to true when click on "create folder " button
             // set to false on complete or exit form
-            displayForm ? formView(dirStack.current.length === 1) : ""
+            displayForm ? formCreateFolderView(dirStack.current.length === 1) : ""
+            
+          }
+
+          {
+            formMoreDetailView()
           }
           
           {
@@ -706,7 +690,8 @@ function FilesBrowser(prps) {
                     fdfunc=
                     {{
                       "onClickChild":changeWorkingDirectory,
-                      "onCreateFolder": createFolderForm
+                      "onCreateFolder": createFolderForm,
+                      // "onDetailView":createDetailViewModal
                     }}
                     />                    
                   
@@ -719,13 +704,15 @@ function FilesBrowser(prps) {
                       
                     }}
                     />
+
+
                   
                 </React.Fragment>
               )
             })()
           }
 
-            <ControlBar toggleDisplayMode={() => toggleDisplayMode()} toggleSmartUpload={() => toggleSmartUpload()} refresh={fetchFileData} speak={() => console.log("hello")} back={() => changeWorkingDirectory("back") }  setConfig={(e) => setConfig(e)}></ControlBar>
+            <ControlBar toggleDisplayMode={() => toggleDisplayMode()} onGoingUploads={""} onGoingDownloads={""}></ControlBar>
           
         </div>
 
@@ -738,6 +725,10 @@ function FilesBrowser(prps) {
     
   }
 
+  function createViewDetailModal() {
+    setViewDetailModal(true)
+  }
+
   function createFolderForm(name) {
     setDisplayForm(true)
   }
@@ -745,7 +736,7 @@ function FilesBrowser(prps) {
   function handleCreateFolderFormSubmit(event) {
     event.preventDefault()
     console.log("Form Submitted:", event)
-    const [folderName, GGLAlloc, DBXAlloc, mode, isSmart]= event.target
+    const [folderName, GGLAlloc, DBXAlloc, mode, isSmart, , isTracked, chunkSize, recDensity]= event.target
 
     document.getElementById("modalClose").click()
 
@@ -753,6 +744,11 @@ function FilesBrowser(prps) {
     
     const dir = dirStack.current
     const target = fileTree.current[dir[dir.length - 1][0]].mergedIDs
+
+    let blockWidth = chunkSize?.value || chunkSize?.placeholder 
+    blockWidth = parseInt(blockWidth)*1024 //form KB to B
+    let recoveryDensity = recDensity?.value || recDensity?.placeholder
+    recoveryDensity = parseInt(recoveryDensity)/100
     
     const requestBody = {
         params: {        
@@ -766,7 +762,9 @@ function FilesBrowser(prps) {
             "google":{limit:(parseInt(GGLAlloc?.value))*1024*1024, usage:0},
             "dropbox":{limit:(parseInt(DBXAlloc?.value))*1024*1024, usage:0}
           },
-          blockWidth:2000,
+          blockWidth,
+          isTracked: isTracked?.checked,
+          recoveryDensity,
           mode: {
             uploadType: parseInt(mode?.value),
             isSmart: isSmart?.checked
@@ -856,7 +854,13 @@ function FilesBrowser(prps) {
     //to make it seem faster/less hang time
 
     //send file list to server side
-    function uploadFiles(files) {
+    function uploadFiles(files, partitionInfo, targetInfo ) {
+
+      let dc, dp
+      //let {droppedContainer:dc, droppedPath:dp} = targetInfo ;
+      dc = targetInfo?.droppedContainer
+      dp = targetInfo?.droppedPath
+
       const dStack = dirStack.current
       const fullWorkingDir = dirStack.current // current working directory stack
       const containingDirId = fullWorkingDir[fullWorkingDir.length-1][0] // Top level directory (wokring directory) id
@@ -876,7 +880,12 @@ function FilesBrowser(prps) {
         const partiionDir = fileTree.current[dStack[1][0]]
         const partitionCfg = partiionDir.partitionConfig.fulfillmentValue[0]
         config = partitionCfg 
-      }   
+      }
+      
+      //simulating drop from backend, needs to sim being in a partition
+      if(partitionInfo) {
+        config = partitionInfo
+      }
 	  
 	  console.log("FB Upload Files Config:", config)
 
@@ -885,8 +894,8 @@ function FilesBrowser(prps) {
       const requestBody = {
         params: {
           config,
-          droppedContainer: containingDir,
-          droppedPath: fullWorkingDir,
+          droppedContainer: dc || containingDir,
+          droppedPath: dp || fullWorkingDir,
                     
         },
         data: Object.values(files).map( ({info, existingFileData}) => {
@@ -903,11 +912,21 @@ function FilesBrowser(prps) {
         requestType:"fileUpload-request",        
         requestBody
       }
+      
+      
 
       return ipcRenderer.send(CHANNEL_NAME_REQ, [request])
     }
 
-    
+    function updateOnGoingUploads(requests) {
+      
+      requests.forEach(request => {
+        const name = request.fileInfo.name
+        onGoingUploads.current[name] = [0, request.fileInfo.size, 0]
+      })
+
+      
+    }
 
     function deleteFile(id) {
       //sends signal to back end to delete file with id=id
@@ -930,10 +949,39 @@ function FilesBrowser(prps) {
       })
 
     }
-
+    // init function
     function updateLoop() { //check for changes by repeatedly querying back end
       fetchFileData()
+      //console.log("listener Set")
+      ipcRenderer.on("simulate-drop", (e, toDrop) => {
+        //console.log("Front: Sim Drop")
+        //console.log("items: ", toDrop)
+        simOnDrop(toDrop[0], toDrop[1], toDrop[2])
+      })
+
+      ipcRenderer.on("FileBrowser-Usage-Response", (event, response) => {
+        response = JSON.parse(response)
+        //console.log("usage res[psme ", response)
+        usage.current = response
+        globalUsage.current = response
+      })
+
+      ipcRenderer.on("FileBrowser-Render-Response", (evnt, response) => {
+        
+        fileTree.current = JSON.parse(response)
+        // Setting based on list file response
+        let currentDirId = (dirStack.current[dirStack.current.length - 1])[0]        
+        const {google, dropbox} = getFolderSize(currentDirId)
+        
+        setDisplayedFiles(fileTree.current[currentDirId].children)        
+        
+      })
       return setInterval(() => {
+        if(document.body.classList.contains("modal-open") ) {
+         //stops re renders occuring if modal is open (due to modal bug - non disappearing overlay)
+          return
+        }
+        
         fetchFileData()
       }, 10000);      
     }
@@ -997,30 +1045,10 @@ function FilesBrowser(prps) {
 
       ipcRenderer.send("FileBrowser-Usage-Request", [{requestType:"getUsage-request", requestBody:{params:{}, data:{}}}, {}])
 
-      ipcRenderer.on("FileBrowser-Usage-Response", (event, response) => {
-        response = JSON.parse(response)
-        console.log("usage res[psme ", response)
-        usage.current = response
-      })
+      
 
 
-      ipcRenderer.on("FileBrowser-Render-Response", (evnt, response) => {
-        
-        fileTree.current = JSON.parse(response)
-        //console.log("Refreshed Data:", fileTree.current)
-        //console.log("mix partition size:",getFolderSize("p_mix partition"))
-        //console.log("byId", fileTree.current)
-        //console.log("byPath", fileTreeByPath.current)
-        
-        // Setting based on list file response
-        let currentDirId = (dirStack.current[dirStack.current.length - 1])[0]
-        
-        const {google, dropbox} = getFolderSize(currentDirId)
-        setCurrentFolderSize([google, dropbox])
-        //setCurrentFolderSize(getFolderSize(currentDirId))
-        setDisplayedFiles(fileTree.current[currentDirId].children)        
-        
-      })
+      
     }   
 
     function changeWorkingDirectory(op, dnext) {      
@@ -1077,7 +1105,7 @@ function FilesBrowser(prps) {
       dirStack.current = d      
 
       //setting based on file tree navigation
-      console.log("tree, nav", fileTree.current, dstr)
+      //console.log("tree, nav", fileTree.current, dstr)
       
       setDisplayedFiles( fileTree.current[dstr] && fileTree.current[dstr].children)
 
@@ -1139,4 +1167,30 @@ function FilesBrowser(prps) {
   export default FilesBrowser;
 
   
-  
+  /*
+              <div className="row">
+
+              <div className="col-10 offset-1 pt-3">              
+                Allocation After Creation   
+              </div>            
+
+              </div>
+
+              <div className="row pt-2">
+
+              <div className="col-12 offset-3">
+              <div class="progress" id="allocationBar">
+                <div class="progress-bar" id="allocaltionBar-Google" role="progressbar" style={{width:"20%", backgroundColor:"yellow"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
+                <div class="progress-bar" id="allocationBar-Dropbox" role="progressbar" style={{width:"20%", backgroundColor:"blue"}} aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>
+                <div class="progress-bar" id="allocaltionBar-GoogleAddition" role="progressbar" style={{width:"20%", backgroundColor:"red"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
+                <div class="progress-bar" id="allocationBar-DropboxAddition" role="progressbar" style={{width:"20%", backgroundColor:"green"}} aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>
+                
+              </div>   
+              </div>
+
+              <div className="col-0 ">
+          
+              </div>
+
+              </div>
+              */

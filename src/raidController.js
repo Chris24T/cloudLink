@@ -1,10 +1,17 @@
 /* eslint-disable no-unused-vars */
 const fs = require("fs");
 
-const paritionInfoDB = require("node-localdb")("./partitionDB.json");
+const partitionInfoDB = require("node-localdb")("./partitionDB.json");
+const tracksDB = require("node-localdb")("./trackingDB.json");
 
 const { partHandler } = require("./filePartHandler");
 const { callClients } = require("./auth/authController");
+
+const { computeChecksum, eventChannel } = require("./helpers");
+const { checkServerIdentity } = require("tls");
+const { isCompositeComponent } = require("react-dom/test-utils");
+const { ipcMain } = require("electron");
+const Promise = require("bluebird");
 
 /**
  * Controls the interpreting of data to/from the APIs
@@ -13,12 +20,21 @@ const { callClients } = require("./auth/authController");
 class raidController {
   constructor() {
     // span, raid copy, raid split, raid parity
-
+    this.init();
     this.config = {
       modes: [0, 1, 2, 3],
       mode: 0,
       SmartSync_enabled: false,
     };
+  }
+
+  deleteFiles(params, files) {
+    files.forEach(({ partSources }) => {
+      let responses = [];
+      callClients((clientId, client) => {
+        if (partSources[clientId]) client.deleteFiles(partSources[clientId]);
+      });
+    });
   }
 
   downloadFiles(params, files) {
@@ -28,16 +44,8 @@ class raidController {
     files.forEach(({ fileInfo, partSources }) => {
       let responses = [];
       callClients((clientId, client) => {
-        responses.push(client.downloadFiles(partSources[clientId]));
-        // responses = [
-        //   ...responses,
-        //   ...client.downloadFiles(partSources[clientId]),
-        // ];
-        // console.log(
-        //   "client response ",
-        //   clientId,
-
-        // );
+        if (partSources[clientId])
+          responses.push(client.downloadFiles(partSources[clientId]));
       });
 
       Promise.all(responses).then((driveResponses) => {
@@ -46,27 +54,61 @@ class raidController {
         driveResponses.forEach((response) => {
           response.forEach((part, i) => {
             if (part) {
+              // in mirror: will override parts at equal positions: so mirror both position 0, only one is kept -> am still downloading both
               combinedResponse[i] = part;
             }
           });
         });
 
-        Promise.all(combinedResponse).then((streams) => {
-          const writable = fs.createWriteStream("./" + fileInfo.name, {
-            emitClose: true,
-            autoClose: true,
-          });
-
-          streams.forEach((partContent, i) => {
-            console.log("part ", i, " merged");
-            partContent.pipe(writable);
-          });
+        console.log("Reconstructing from ", combinedResponse.length, " Parts");
+        const writable = fs.createWriteStream("./Downloads/" + fileInfo.name, {
+          emitClose: true,
+          autoClose: true,
         });
+
+        Promise.mapSeries(combinedResponse, (stream, index) => {
+          const isLastIndex = index === combinedResponse.length - 1;
+          console.log(index, combinedResponse.length);
+          stream.on("data", (ch) => {
+            console.log(ch.length);
+          });
+          stream.pipe(writable, { end: isLastIndex });
+          return new Promise((resolve) => stream.on("end", resolve));
+        });
+
+        // stream.on("data", () => {
+        //   console.log("RAID DATA");
+        // });
+        //console.log("index ", index, isLastIndex);
+
+        // Promise.all(combinedResponse).then((streams) => {
+
+        //   streams.forEach((partContent, i) => {
+        //     console.log("part ", i, " merged");
+        //     partContent.pipe(writable);
+        //   });
+        // });
         //should be in order already
         //just need to pipe to same write stream
         //use fileInfo here to get file name (and type)
       });
     });
+  }
+
+  check() {
+    console.log("check");
+    this.mark();
+  }
+
+  mark() {
+    console.log("mark");
+    this.check();
+    return 5;
+  }
+
+  init() {
+    this.startTracking();
+    //this.startRefreshLoop()
   }
 
   /**
@@ -76,11 +118,14 @@ class raidController {
    */
 
   uploadFiles({ config, ...targetInfo }, files) {
-    const { targets, mode } = config;
+    const { targets, mode, isTracked } = config; //partitionConfig
     let recipients = Object.keys(targets);
 
     console.log("RC: Upload Target Info", targetInfo);
     console.log("RC: Upload Files", files);
+    console.log("TrackStatus:", isTracked);
+
+    if (isTracked) addtrackedFiles(config, targetInfo, files);
 
     files.forEach(async (file) => {
       const [
@@ -114,11 +159,101 @@ class raidController {
         //client.renameFiles([{fileInfo:file, parts:toRenameParts[clientId]}], targetInfo)
       }, recipients);
     });
+
+    async function addtrackedFiles(config, targetInfo, filesToTrack) {
+      let filesProcessed = 0;
+      filesToTrack.forEach(async (file) => {
+        const path = file.fileInfo.path;
+
+        const md5Checksum = await computeChecksum(path);
+
+        // if not being tracked, track it
+        console.log("tracksDb", await tracksDB.find({ path }));
+        if ((await tracksDB.find({ path })).length === 0) {
+          //also need checksum here to compare against
+          console.log("inserting cehcksum", md5Checksum);
+          delete targetInfo.children;
+          tracksDB.insert({
+            path,
+            fileInfo: { ...file.fileInfo, md5Checksum },
+            config,
+            targetInfo,
+          });
+        }
+        filesProcessed++;
+      });
+    }
+  }
+
+  async startTracking() {
+    //at interval get
+    setInterval(async () => {
+      //compute cheksums of each tracked path
+      const tracked = await tracksDB.find({});
+      // console.log("tracked", tracked);
+      tracked.forEach(async (file) => {
+        const { fileInfo, config, targetInfo } = file;
+        const { path, md5Checksum } = fileInfo;
+        try {
+          const currentChecksum = await computeChecksum(path);
+          //console.log("cur", currentChecksum, "last", md5Checksum);
+          console.log("cur ", currentChecksum, " vs ", md5Checksum);
+          if (currentChecksum !== md5Checksum) {
+            //reupload file, by path, to its current location.
+            //need to get all file info from tracksDB
+
+            //send reqeust to frontend to simulate a drop
+            //will need all the drop info + parittion config info + fileDetails
+            eventChannel.emit(
+              "tracked_File_Mismatch",
+              fileInfo,
+              config,
+              targetInfo
+            );
+            //could "simulate drop" of all mutated files at once, or just do deqeuntially
+            // current: sequential
+            console.log("Tracked Change Detected, Reuploading");
+
+            console.log("Relecting in DB");
+            // Mutate existing entry - updating checksum in db
+            console.log("DOESNT EXIST");
+            const existingEntry = await tracksDB.find({ path });
+            console.log("Existing ", existingEntry);
+            //existingEntry.fileInfo.md5Checksum = currentChecksum;
+            console.log("HERE");
+            //delete existing entry
+            tracksDB.remove({ path }).then((v) => console.log("v", v));
+            //replace with new
+            existingEntry.fileInfo.md5Checksum = currentChecksum;
+            const newEntry = existingEntry;
+            tracksDB.insert(newEntry).then((u) => console.log("u", u));
+            //need to update db entry to include new checksum
+          }
+        } catch (e) {
+          //console.log("Path No Longer Exists ", path);
+        }
+      });
+
+      //check if they differ form stored one
+
+      //if yes, reupload
+
+      //else, continue
+      //}, 900000);
+    }, 15000);
   }
 
   createFolder(
     { targetDrive, targetPath },
-    { name, isPartition, blockWidth, allocation, mode }
+    {
+      name,
+      isPartition,
+      isTracked,
+      blockWidth,
+      recoveryDensity,
+      allocation,
+      mode,
+    }
   ) {
     //console.log("CREATING FOLDER in", targetPath);
     // console.log("fodler create targetrs", targetDrive);
@@ -139,7 +274,15 @@ class raidController {
       //want the names of the drives whose limit is non zero
 
       //console.log("Parition Name", name);
-      paritionInfoDB.insert({ name, mode, targets, blockWidth });
+      partitionInfoDB.insert({
+        name,
+        mode,
+        targets,
+        tracks: [],
+        isTracked,
+        blockWidth,
+        recoveryDensity,
+      });
       callClients((clientId, client) => {
         client.createPartitionFolder(name);
       }, Object.keys(targets));
@@ -152,8 +295,6 @@ class raidController {
 
     return;
   }
-
-  deleteFiles() {}
 
   getSpaceUsage() {
     let usage = [];
@@ -218,6 +359,7 @@ async function formatLists(lists) {
   let parentList = {};
 
   for (const { entries: list, origin } of lists) {
+    // console.log(origin, " list ", list);
     let sublist = await formatOptions[origin](list, origin);
 
     if (!Object.keys(parentList).length) {
@@ -277,6 +419,7 @@ async function formatLists(lists) {
     return { ...a, ...b };
   }
 
+  // Make folder for files not in a partition
   parentList["p_Unpartitioned Files"] = {
     name: "p_Unpartitioned Files",
     mergedIDs: {},
@@ -285,6 +428,7 @@ async function formatLists(lists) {
     children: {},
   };
 
+  // add folder to root children
   parentList["home"].children["p_Unpartitioned Files"] = {
     name: "p_Unpartitioned Files",
     mergedIDs: {},
@@ -305,6 +449,11 @@ async function formatLists(lists) {
       delete parentList["home"].children[child.name];
     }
   }
+
+  // if it has no children, dont show it
+  if (Object.keys(parentList["p_Unpartitioned Files"].children).length === 0) {
+    delete parentList["home"].children["p_Unpartitioned Files"];
+  }
   //console.log("Built List, sending to front", parentList);
 
   return parentList;
@@ -320,7 +469,7 @@ async function formatLists(lists) {
         if (el[".tag"] === "folder") {
           if (el.name.includes("p_")) {
             el.isPartitionFolder = true;
-            el.partitionConfig = paritionInfoDB.find({ name: el.name });
+            el.partitionConfig = partitionInfoDB.find({ name: el.name });
           }
           acc[el.name] = acc[el.name] || {
             name: el.name,
@@ -387,13 +536,7 @@ async function formatLists(lists) {
         if (el["mimeType"].includes("folder")) {
           if (el.name.includes("p_")) {
             el.isPartitionFolder = true;
-            el.partitionConfig = paritionInfoDB.find({ name: el.name });
-            // console.log(
-            //   "got config for",
-            //   el.name,
-            //   "config:",
-            //   el.partitionConfig
-            // );
+            el.partitionConfig = partitionInfoDB.find({ name: el.name });
           }
 
           acc[el.id] = acc[el.id] || {
@@ -404,6 +547,8 @@ async function formatLists(lists) {
 
             children: {},
           };
+          // if already exists from a childs reference
+          // Need to add the missing properties
           acc[el.id].name = el.name;
           acc[el.id].size = el.quotaBytesUsed || 0;
           acc[el.id].isPartitionFolder = el.isPartitionFolder;

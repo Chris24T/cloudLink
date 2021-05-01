@@ -5,9 +5,20 @@ const fs = require("fs");
 const { content } = require("googleapis/build/src/apis/content");
 const { off } = require("process");
 class filePartHandler {
-  genContentHash(rs) {
+  genContentHash(rs, type) {
     return new Promise((resolve, reject) => {
-      const hash = crypto.createHash("md5");
+      let hash;
+
+      switch (type) {
+        case "md5":
+          hash = crypto.createHash("md5");
+          break;
+        case "sha256":
+          hash = crypto.createHash("sha256");
+          break;
+        default:
+          hash = crypto.createHash("md5");
+      }
 
       rs.on("error", (err) => reject(err));
       rs.on("data", (chunk) => hash.update(chunk));
@@ -24,13 +35,15 @@ class filePartHandler {
    */
   async buildParts(
     { fileInfo, existingFileData },
-    { targets, blockWidth: chunkSize = 4194304, mode }
+    { targets, blockWidth: chunkSize = 4194304, recoveryDensity, mode }
   ) {
     //! Have targets, so also have usage - can distribute based on that
-    //! will also need to set usage at some point though from front end
+    //! will also need to set usage limits at some point though from front end
     const { uploadType, isSmart } = mode;
     const { name, path, size } = fileInfo;
     const vendorList = Object.keys(targets);
+
+    const recoveryStepSize = Math.round(1 / recoveryDensity);
 
     const toUpload = vendorList.reduce((acc, v) => (acc[v] = []) && acc, {}),
       toDelete = vendorList.reduce((acc, v) => (acc[v] = []) && acc, {}),
@@ -284,7 +297,7 @@ class filePartHandler {
           }
         }
 
-        offset += isFound ? chunkSize : 1;
+        offset += isFound ? chunkSize : recoveryStepSize;
         //partCounter += isFound ? 1 : 0;
       }
 
@@ -321,12 +334,21 @@ class filePartHandler {
             start: offset,
             end: offset + chunkSize > end ? end : offset + chunkSize,
           })
+        ),
+        contentChecksumSha = await this.genContentHash(
+          fs.createReadStream(path, {
+            start: offset,
+            end: offset + chunkSize > end ? end : offset + chunkSize,
+          }),
+          "sha256"
         );
 
       let part = {};
 
       part.name = contentChecksum + "||" + counter++;
       part.checksum = contentChecksum;
+      part.md5Checksum = contentChecksum;
+      part.sha256Checksum = contentChecksumSha;
       part.content = content;
       part.size = offset + chunkSize > end ? end - offset : offset + chunkSize;
       // if (offset % chunkSize === 0)

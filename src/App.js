@@ -24,7 +24,11 @@ function App() {
   const [currentFolderSize, setCurrentFolderSize] = useState([]);
   const usageStatistics = useRef({});
   const partitionUsage = useRef([]);
+  const onGoingDownloads = useRef([]);
+  const onGoingUploads = useRef([]);
 
+  const globalUsage = useRef({});
+  const currentPartitionUsage = useRef({});
   useEffect(() => {
     return () => {};
   }, []);
@@ -79,9 +83,13 @@ function App() {
           setDisplayFiles,
           currentFolderSize,
           setCurrentFolderSize,
+          globalUsage,
           usageStatistics,
           convertUnits,
+          currentPartitionUsage,
           partitionUsage,
+          onGoingDownloads,
+          onGoingUploads,
         }}
       >
         <Router>

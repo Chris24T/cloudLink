@@ -2,8 +2,6 @@ const fs = require("fs");
 const readline = require("readline");
 
 const { google } = require("googleapis");
-const { file } = require("googleapis/build/src/apis/file");
-const { FileSlides } = require("react-bootstrap-icons");
 
 const CLIENT_ID = process.env.GOOGLE_AUTH_CLIENT_ID,
   CLIENT_SECRET = process.env.GOOGLE_AUTH_CLIENT_SECRET,
@@ -109,7 +107,7 @@ class googleAuth {
             pageSize: 500,
             q: toList && "name='" + toList + "'", //? why isnt it ||
             fields:
-              "nextPageToken, files(id, name, thumbnailLink, mimeType, parents, shared, quotaBytesUsed)",
+              "nextPageToken, files(id, name, thumbnailLink, md5Checksum, mimeType, parents, shared, quotaBytesUsed)",
             responseType: "stream",
           },
           (err, res) => {
@@ -353,8 +351,20 @@ class googleAuth {
           responseType: "stream",
         }
       );
+
+      // resp.on("data", () => {
+      //   console.log("GGL DOWNLOAD: Data");
+      // });
+      // resp.on("end", () => {
+      //   console.log("GGL DOWNLOAD: Finsihed");
+      // });
+
       return resp.then((val) => {
         //console.log("GGL RESP:", val);
+        //let total = 0;
+        // val.data.on("data", (chunk) => {
+        //   console.log("GGL: data on data: ", (total += chunk.length));
+        // });
         return val.data;
       });
 

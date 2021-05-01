@@ -12,7 +12,8 @@ const CLIENT_ID = process.env.DROPBOX_AUTH_CLIENT_ID,
   TOKEN_PATH = process.env.DROPBOX_TOKEN_PATH,
   DOWNLOADS_DIR = process.env.DOWNLOAD_PATH,
   VENDOR_NAME = "dropbox",
-  ROOTID = "/";
+  ROOTID = "/",
+  CHECKSUM_TEMPLATE = "checksums";
 
 class dropboxAuth {
   constructor() {
@@ -64,6 +65,10 @@ class dropboxAuth {
       return client.filesListFolder({
         path,
         recursive: true,
+        // include_property_groups: {
+        //   // ".tag": "filter_some",
+        //   // filter_some: ["id"],
+        // },
       });
     }
   }
@@ -74,6 +79,7 @@ class dropboxAuth {
     console.log("DBX: attempting to delete ", files.length, " files");
     this.authorize((client) => {
       files.forEach((file) => {
+        console.log("detelging file", file);
         _deleteFile(client, file);
       });
     });
@@ -144,17 +150,40 @@ class dropboxAuth {
       fileCounter++;
     });
 
-    function _uploadFile(client, fileInfo, fileContent, pNum) {
+    async function _uploadFile(client, fileInfo, fileContent, pNum) {
       const contents = fileContent.content,
         path = fileInfo.path + fileContent.name;
       //console.log("DBX install path:",path)
+
+      // let template = {
+      //   name: "checksums",
+      //   description: "md5 and sha256 cheksums",
+      //   type: { ".tag": "string" },
+      // };
+
+      // const tmp = await client.filePropertiesTemplatesAddForUser({
+      //   name: "User",
+      //   description: "checksumTemplate",
+      //   fields: [template],
+      // });
+
+      // let field = { name: "checksums", value: "THISISACHECKSUM" };
+      // let propertyGroup = {
+      //   template_id: tmp.result.template_id,
+      //   fields: [field],
+      // };
 
       const resp = client.filesUpload(
         {
           contents,
           path,
-        },
-        (err) => console.log(err)
+          // property_groups: [propertyGroup],
+        }
+        // (err) => {
+        //   console.log(err);
+        //   console.log(resp);
+        //   return err;
+        // }
       );
       resp.then((message) => console.log("DBX Upload Response:", message));
 
@@ -163,7 +192,7 @@ class dropboxAuth {
   }
 
   downloadFiles(files) {
-    console.log("DBX - Initiating ", file.length, " Downloads");
+    console.log("DBX - Initiating ", files.length, " Downloads");
     return new Promise((resolve) => {
       this.authorize((client) => {
         let responses = [];

@@ -5,7 +5,7 @@ import 'bootstrap/dist/css/bootstrap.css';
 function ButtonBar(props) {
 
     return (
-
+        <React.Fragment>
         <div className="btnbar" /*style={{textAlign:"center", height:"15px"}}*/   >
             
             <div class="btnbarElem">
@@ -40,9 +40,16 @@ function ButtonBar(props) {
         </div>
 
 
+         
+
+  
+        </React.Fragment>
+
 
 
     )
 }
+
+
 
 export default ButtonBar
