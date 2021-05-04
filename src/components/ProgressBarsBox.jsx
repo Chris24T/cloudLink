@@ -5,7 +5,7 @@ import {browserContentContext } from "../Contexts/browserContentContext"
 
 
 export function ProgressBarsBox(props) {
-    //console.log("PROPS", props)
+    
     const { onGoingDownloads, onGoingUploads} = useContext(browserContentContext)
     
     const downloads = onGoingDownloads.current
@@ -18,11 +18,7 @@ export function ProgressBarsBox(props) {
         }
     }, [Object.keys(onGoingUploads).length, Object.keys(onGoingDownloads).length])
 
-    // if(uploadFiles.length === 0) hideElement("progress_uploads")
-    // else showElement("progress_uploads")
-
-    // if(downloadFiles.length === 0) hideElement("progress_downloads")
-    // else showElement("progress_downloads")
+  
 
     return(
         <div id="progressBox">

@@ -116,7 +116,6 @@ class filePartHandler {
           }
         }
       } else if (existingFileData && isSmart) {
-        console.log("recveriong");
         //recovery
         await recovery.call(this);
         return [toUpload, toDelete, toRename];

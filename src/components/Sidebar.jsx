@@ -51,18 +51,7 @@ function SideBar({actions}) {
             <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
             </svg>            
         </div>
-        </Link>
-
-        {/* <Link to="/">
-            <div className="Sidebar_Button" onClick={() =>{}}>
-
-                <span className="tooltiptext">Partitions</span>
-                <svg style={{left:"5px", position:"relative", top:"20%", paddingBottom:"6px"}} xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" class="bi bi-columns" viewBox="0 0 16 16">
-                    <path d="M0 2a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1V2zm8.5 0v8H15V2H8.5zm0 9v3H15v-3H8.5zm-1-9H1v3h6.5V2zM1 14h6.5V6H1v8z"/>
-                </svg>
-            </div>
-        </Link> */}
-        
+        </Link>               
 
              <div className="SidebarBottom_ButtonGroup">                
              <Link to="/settings" styleclassName="navbtn">
