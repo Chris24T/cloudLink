@@ -72,10 +72,8 @@ function DriveCapacity(props) {
     
     function PartitionCapacity() {
         const partitionName = dirStack.current[1][0]
-
         const driveusage = globalUsage.current
-        //console.log("Total Drive Usage", driveusage)      
-        //console.log("Total Partition Size", currentFolderSize)
+       
         let googleUsed = parseInt(currentFolderSize[0][1])
         let dropboxUsed = parseInt(currentFolderSize[1][1])
         const googleAlloc = parseInt(currentFolderSize[0][0])
@@ -92,11 +90,11 @@ function DriveCapacity(props) {
         const mergeDropboxWidth = (Math.floor((100*(dropboxUsed||1)/totalAlloc||100))||1)+"%"
         
         const totalAllocMerge = dropboxAlloc+googleAlloc
-        //console.log("alloc", totalAllocMerge)
+        
         const totalUsedMerge = googleUsed+dropboxUsed
 
 
-        //console.log("ggl", googleWidth)
+        
         return (
             <React.Fragment>
             <div id="capacity-Merged">

@@ -8,9 +8,6 @@ const { partHandler } = require("./filePartHandler");
 const { callClients } = require("./auth/authController");
 
 const { computeChecksum, eventChannel } = require("./helpers");
-const { checkServerIdentity } = require("tls");
-const { isCompositeComponent } = require("react-dom/test-utils");
-const { ipcMain } = require("electron");
 
 const Promise = require("bluebird");
 
@@ -20,7 +17,6 @@ const Promise = require("bluebird");
  */
 class raidController {
   constructor() {
-    // span, raid copy, raid split, raid parity
     this.init();
     this.config = {
       modes: [0, 1, 2, 3],
@@ -29,7 +25,9 @@ class raidController {
     };
   }
 
+  // Accepts a delete file(s) request form front end and informs the Cloud drive APIs
   deleteFiles(params, files) {
+    //unwrapping request parameters
     files.forEach(({ partSources }) => {
       let responses = [];
       callClients((clientId, client) => {
@@ -38,10 +36,9 @@ class raidController {
     });
   }
 
+  // Accepts a download file(s) request form front end and informs the Cloud drive APIs
   downloadFiles(params, files) {
-    console.log("Download Request:", files);
-
-    //parts need their order part:[positoin, id]
+    //unwrapping request parameters
     files.forEach(({ fileInfo, partSources }) => {
       let responses = [];
       callClients((clientId, client) => {
@@ -49,24 +46,25 @@ class raidController {
           responses.push(client.downloadFiles(partSources[clientId]));
       });
 
+      // await all responses, combine them
       Promise.all(responses).then((driveResponses) => {
         let combinedResponse = [];
 
         driveResponses.forEach((response) => {
           response.forEach((part, i) => {
             if (part) {
-              // in mirror: will override parts at equal positions: so mirror both position 0, only one is kept -> am still downloading both
               combinedResponse[i] = part;
             }
           });
         });
 
-        console.log("Reconstructing from ", combinedResponse.length, " Parts");
+        //Writable for file download location
         const writable = fs.createWriteStream("./Downloads/" + fileInfo.name, {
           emitClose: true,
           autoClose: true,
         });
 
+        // Await each part downloaded to be completed, as they are, pipe to write stream
         Promise.mapSeries(combinedResponse, (stream, index) => {
           const isLastIndex = index === combinedResponse.length - 1;
           console.log(index, combinedResponse.length);
@@ -76,55 +74,20 @@ class raidController {
           stream.pipe(writable, { end: isLastIndex });
           return new Promise((resolve) => stream.on("end", resolve));
         });
-
-        // stream.on("data", () => {
-        //   console.log("RAID DATA");
-        // });
-        //console.log("index ", index, isLastIndex);
-
-        // Promise.all(combinedResponse).then((streams) => {
-
-        //   streams.forEach((partContent, i) => {
-        //     console.log("part ", i, " merged");
-        //     partContent.pipe(writable);
-        //   });
-        // });
-        //should be in order already
-        //just need to pipe to same write stream
-        //use fileInfo here to get file name (and type)
       });
     });
   }
 
-  check() {
-    console.log("check");
-    this.mark();
-  }
-
-  mark() {
-    console.log("mark");
-    this.check();
-    return 5;
-  }
-
   init() {
     this.startTracking();
-    //this.startRefreshLoop()
+    //this.startRefreshLoop
   }
 
-  /**
-   *
-   * @param {*} Object contains upload config e.g stripe + smart and info about target (upload dir - the parent)
-   * @param {*} files list of files (meta) to upload
-   */
-
+  // Accepts a Upload file request form front end and informs the Cloud drive APIs
   uploadFiles({ config, ...targetInfo }, files) {
     const { targets, mode, isTracked } = config; //partitionConfig
     let recipients = Object.keys(targets);
 
-    // console.log("RC: Upload Target Info", targetInfo);
-    // console.log("RC: Upload Files", files);
-    // console.log("TrackStatus:", isTracked);
     const Stopwatch = require("statman-stopwatch");
     const localstopwatch = new Stopwatch();
 
@@ -137,15 +100,6 @@ class raidController {
         toDeleteParts,
         toRenameParts,
       ] = await partHandler.buildParts(file, config); // width is being passed from config
-      console.log("Rsync duration: ", localstopwatch.stop());
-      // const totalSize = Object.values(toUploadParts).reduce((acc, el, i) => {
-      //   console.log("el i", i);
-      //   for (const part of el) {
-      //     console.log("part size:", part.size);
-      //     acc += part.size;
-      //     return acc;
-      //   }
-      // }, 0);
 
       let total = 0;
 
@@ -155,14 +109,10 @@ class raidController {
         }
       }
 
-      console.log("StartSize: ", file.fileInfo.size, " Upload Size: ", total);
-
-      // console.log("RC: Parts To Upload", toUploadParts);
       let responses = [];
 
       callClients((clientId, client) => {
         // upload new data - edits
-        //console.log("RC: todelete", toDeleteParts);
         client.deleteFiles(toDeleteParts[clientId]);
 
         //timeout for api rate limits
@@ -183,7 +133,6 @@ class raidController {
         }, 2000);
 
         //rename parts to retain correct parts ordering
-        //client.renameFiles([{fileInfo:file, parts:toRenameParts[clientId]}], targetInfo)
       }, recipients);
     });
 
@@ -217,14 +166,11 @@ class raidController {
     setInterval(async () => {
       //compute cheksums of each tracked path
       const tracked = await tracksDB.find({});
-      // console.log("tracked", tracked);
       tracked.forEach(async (file) => {
         const { fileInfo, config, targetInfo } = file;
         const { path, md5Checksum } = fileInfo;
         try {
           const currentChecksum = await computeChecksum(path);
-          //console.log("cur", currentChecksum, "last", md5Checksum);
-          //console.log("cur ", currentChecksum, " vs ", md5Checksum);
           if (currentChecksum !== md5Checksum) {
             //reupload file, by path, to its current location.
             //need to get all file info from tracksDB
@@ -237,36 +183,22 @@ class raidController {
               config,
               targetInfo
             );
-            //could "simulate drop" of all mutated files at once, or just do deqeuntially
-            // current: sequential
-            console.log("Tracked Change Detected, Reuploading");
 
-            console.log("Relecting in DB");
             // Mutate existing entry - updating checksum in db
-            console.log("DOESNT EXIST");
             const existingEntry = await tracksDB.find({ path });
-            console.log("Existing ", existingEntry);
-            //existingEntry.fileInfo.md5Checksum = currentChecksum;
-            console.log("HERE");
+
             //delete existing entry
             tracksDB.remove({ path }).then((v) => console.log("v", v));
-            //replace with new
+
+            //replace with new - updating db entry to include new checksum
             existingEntry.fileInfo.md5Checksum = currentChecksum;
             const newEntry = existingEntry;
             tracksDB.insert(newEntry).then((u) => console.log("u", u));
-            //need to update db entry to include new checksum
           }
         } catch (e) {
           //console.log("Path No Longer Exists ", path);
         }
       });
-
-      //check if they differ form stored one
-
-      //if yes, reupload
-
-      //else, continue
-      //}, 900000);
     }, 15000);
   }
 
@@ -282,25 +214,17 @@ class raidController {
       mode,
     }
   ) {
-    //console.log("CREATING FOLDER in", targetPath);
-    // console.log("fodler create targetrs", targetDrive);
-    // console.log("fodler create targetrs", targetPath);
     if (isPartition) {
       //Parition folder creation
       name = "p_" + name;
-      //("will loop over", Object.entries(allocation));
       const targets = Object.entries(allocation).reduce(
         (acc, [drive, alloc]) => {
-          //console.log("loop", drive, alloc);
           if (alloc.limit) acc[drive] = alloc;
           return acc;
         },
         {}
       );
 
-      //want the names of the drives whose limit is non zero
-
-      //console.log("Parition Name", name);
       partitionInfoDB.insert({
         name,
         mode,
@@ -310,6 +234,7 @@ class raidController {
         blockWidth,
         recoveryDensity,
       });
+      //Partition Folder Creation
       callClients((clientId, client) => {
         client.createPartitionFolder(name);
       }, Object.keys(targets));
@@ -323,6 +248,7 @@ class raidController {
     return;
   }
 
+  //Returns the availible capacity on a users drive
   getSpaceUsage() {
     let usage = [];
     callClients((clientID, client) => {
@@ -338,6 +264,7 @@ class raidController {
     });
   }
 
+  //returns the meta data of all files existing on a cloud drive
   listFiles() {
     let clientResponses = [];
 
@@ -352,6 +279,8 @@ class raidController {
       clientResponses.push(l);
     });
 
+    // Once the file lists are obtained,
+    // Need to structure it to be navigable
     return Promise.all(clientResponses).then((fileLists) => {
       const formattedList = formatLists(fileLists);
       return formattedList;
@@ -366,18 +295,9 @@ raidController.prototype.getCapacities = function () {
   });
 
   return capacities;
-
-  const clients = this.config.clients;
-  let res = [];
-  Object.keys(clients).forEach((clientKey) => {
-    const client = clients[clientKey];
-    //res[clientKey] = clients[clientKey].getCapacity()
-    res.push(client.getCapacity());
-  });
-
-  return res;
 };
 
+// Function to format the seperate listfiles response into a single object
 async function formatLists(lists) {
   const formatOptions = {
     google: _formatGoogle,
@@ -386,7 +306,6 @@ async function formatLists(lists) {
   let parentList = {};
 
   for (const { entries: list, origin } of lists) {
-    // console.log(origin, " list ", list);
     let sublist = await formatOptions[origin](list, origin);
 
     if (!Object.keys(parentList).length) {
@@ -402,22 +321,12 @@ async function formatLists(lists) {
         const newChildren = entry.children;
         const oldChildren = parentListEntry.children;
 
-        // merge - am not merging individual children -> mergeID
-
-        //parentListEntry.children = { ...newChildren, ...oldChildren };
-
         parentListEntry.children = mergeChildren(newChildren, oldChildren);
 
         parentListEntry.mergedIDs = {
           ...parentListEntry.mergedIDs,
           ...entry.mergedIDs,
         };
-
-        // if (parentListEntry.isPartitionFolder) {
-        //   // if is partition, merge ids as child so it shows as mixed when looking at it as a child
-        //   parentList["home"].children[parentListEntry.name].mergedIDs =
-        //     parentListEntry.mergedIDs;
-        // }
 
         //add back mutated version
         parentList[entry.name] = parentListEntry;
@@ -465,7 +374,6 @@ async function formatLists(lists) {
 
   for (const child of Object.values(parentList["home"].children)) {
     if (!child.isPartitionFolder) {
-      // console.log("child", child);
       parentList["p_Unpartitioned Files"].children[child.name] = child;
       parentList["p_Unpartitioned Files"].mergedIDs[
         Object.keys(child.mergedIDs)[0]
@@ -481,7 +389,6 @@ async function formatLists(lists) {
   if (Object.keys(parentList["p_Unpartitioned Files"].children).length === 0) {
     delete parentList["home"].children["p_Unpartitioned Files"];
   }
-  //console.log("Built List, sending to front", parentList);
 
   return parentList;
 
@@ -540,12 +447,6 @@ async function formatLists(lists) {
       }
     );
 
-    // //swap from by name to by id
-    // const listById = Object.values(listByName).reduce((acc, el) => {
-    //   acc[el.id] = el;
-    //   return acc;
-    // }, {});
-    //console.log("dbx map", listById);
     return listByName;
   }
 
@@ -624,22 +525,3 @@ async function formatLists(lists) {
 }
 
 module.exports = new raidController();
-
-/*
-
-Some key features that you will have to decide on when selecting a hardware RAID controller include:
-
-SATA and/or SAS interface (and related throughput speeds)
-RAID levels supported
-Operating system compatibility
-Number of devices supported
-Read/write performance
-IOPs rating
-Cache size
-PCIe interface
-Encryption capabilities
-Power consumption
-
-https://searchstorage.techtarget.com/definition/RAID-controller
-
-*/

@@ -80,7 +80,7 @@ class googleAuth {
     });
   }
 
-  //TODO
+  //Returns a users space usage for the drive
   getSpaceUsage() {
     const resp = this.authorize((client) => {
       return client.about.get({
@@ -97,8 +97,9 @@ class googleAuth {
     });
   }
 
-  // name is not "Home" that is an app naming convetion, am actulally looking for "root" - or equivalent
+  // Returns the list of meta data of the file on the drive
   async listFiles(listPath = [["", ROOTID]]) {
+    // name is not "Home" that is an app naming convetion, am actulally looking for "root" - or equivalent
     //id of the containing folder being listed
     const toList = listPath[listPath.length - 1][0];
 
@@ -129,9 +130,10 @@ class googleAuth {
     });
   }
 
+  //Provides authorized access to the API to delete files
   deleteFiles(files) {
     if (files.length === 0) return;
-    console.log("GGL: attempting to delete", files.length, " files");
+
     this.authorize((client) => {
       files.forEach((file) => {
         _deleteFile(client, file);
@@ -143,9 +145,10 @@ class googleAuth {
     }
   }
 
+  //Provides authorized access to the API to rename files
   renameFiles(files) {
     if (files.length === 0) return;
-    console.log("GGL: attempting to rename ", files.length, " files");
+
     this.authorize((client) => {
       files.forEach((file) => {
         _renameFile(client, file);
@@ -160,8 +163,7 @@ class googleAuth {
     }
   }
 
-  // recieve from front: {conifg, files}
-  // upload expects: upload(files[], config={isSmart, mode, target->e.g. google})
+  //Provides authorized access to the API to Upload files
   uploadFiles(files, targetInfo, mode) {
     const { uploadType } = mode;
 
@@ -171,12 +173,6 @@ class googleAuth {
     this.authorize((client) => {
       files.forEach(async ({ file, parts }) => {
         const { fileInfo, existingFileData } = file;
-        console.log(
-          "GGL: ",
-          parts.length,
-          " Upload requests for",
-          fileInfo.name
-        );
 
         if (parts.length === 0) return;
         if (parts.length === 1 && uploadType !== 2 && uploadType !== 3)
@@ -191,28 +187,20 @@ class googleAuth {
           );
           partCounter++;
         });
-        fileCounter++;
+
         partCounter = 1;
-        //console.log("resps", responses);
         Promise.all(responses).then((fullfill) => {
           console.log(stopwatch.stop());
         });
       });
     });
 
-    //? expected deconstruct: {id, system_path, virtual_path, ...rest}
-
-    //update - fileid is passed, else no id
-
     function _uploadFile(client, fileInfo, fileContent, pNum, maxParts) {
       const { parent } = fileInfo;
       const { name, content } = fileContent;
 
-      //content.on("data", (chunk) => console.log("sub-Chunk uploaded", chunk));
-
       const resource = {
           name,
-          //id: id || null //should handle update vs create - no id (null) means does not exist in cloud -> is a new file
           parents: [parent], //if the parent exists, use it, else create it from the path, returning the penultimate id i.e. the parent
         },
         media = {
@@ -220,7 +208,6 @@ class googleAuth {
           //body: content.on("data", chunk => console.log("sub-Chunk uploaded", chunk))
           body: content,
         };
-      //if (pNum === 1) stopwatch.start();
 
       return new Promise((res) => {
         const resp = client.files.create(
@@ -234,18 +221,13 @@ class googleAuth {
               return console.log("File: ", name, " Part Upload Failure: ", err);
             console.log("File: ", name, " part ", pNum, "Upload Success");
             res(resp);
-            //if (resp && pNum === maxParts)
-            //console.log("Google: ", stopwatch.stop());
           }
         );
       });
-
-      // if (pNum === maxParts) resp.then(() => console.log(stopwatch.stop()));
     }
   }
 
-  // ! when building parts, should get each contaiing folder too
-  // reuturn parent id for containing folder of file or file parts
+  // Finds the parent id of the container folder for the parts
   async findParent(
     { fileInfo, existingFileData },
     { droppedContainer, droppedPath },
@@ -255,20 +237,15 @@ class googleAuth {
     let pID;
 
     if (parseInt(uploadType) === 0 || parseInt(uploadType) === 1) {
-      //* can upload to conatining dir
-
+      //Upload is simple, can upload directly to dropped container
       if (droppedPath.length > 1) {
         return droppedContainer.mergedIDs[vID][0];
       } else {
         return ROOTID;
       }
     } else {
-      //* is striped - need striped folder -> get or create
-
-      //* exisitng data -> existing containing folder
-      //* else create it
-      //console.log("GGL: Stripe dropped Container", droppedContainer);
-      //console.log("GGL: Stripe Existing Data", existingFileData);
+      //Upload is not simple and is therefore striped, requried to create a part container folder
+      // to hold the parts
       if (existingFileData.parts[vID]) {
         pID = existingFileData.container.mergedIDs[vID][0];
       } else {
@@ -282,67 +259,9 @@ class googleAuth {
     }
 
     return pID;
-
-    // if (vID in Object.keys(targetDrive)) {
-    //   //working in "native"
-
-    //   if (existingFileData[vID]) {
-    //     // e.g. root/path...
-    //     // ->   /f_*name*
-    //     // if already exists, use same containing folder to upload to - regardless of upload type
-    //     pID = existingFileData[vID].containingFolder[1];
-    //   } else {
-    //     // need to create files part folder
-    //     // target Path only relevent if drive is target
-    //     // * should set target automatically based on current dir
-    //     const installDirID = targetPath[targetPath.length - 1][1];
-    //     pID = installDirID;
-
-    //     if (uploadType === 2)
-    //       pID = (await this.createFolder(installDirID, "__" + name)).data.id;
-
-    //     // if simple, parent is tos,
-    //     // else create folder, return taht folder id
-
-    //     // dont need to create this folder, if simple upload
-    //   }
-    // } else {
-    //   //working in "foreign"
-    //   let foreign = foreignFolders[vID];
-
-    //   if (existingFileData[vID]) {
-    //     //? foregin must exist here surely - since where else would the containing folder be if it exists?
-
-    //     // e.g. root/__foreign__/
-    //     // -> /f_*name*
-
-    //     //! need to consider if containingFolder can be changed
-    //     //! e.g. case of changing primary drive (target) where file is stored
-    //     //! -> native and foreign could switch
-    //     //* Assuming for now: cannot change the primary drive - means above (blue) query should hold
-    //     const parentFolder = existingFileData[vID].containingFolder;
-
-    //     pID = parentFolder[1];
-    //   } else {
-    //     let foreignID;
-    //     // if foreign does not exist
-    //     //create it
-    //     if (!foreign) {
-    //       foreignID = (await this.createFolder(ROOTID, "__foreign__")).data.id;
-    //     } else foreignID = foreign[1];
-    //     console.log("ggl doreign", foreign);
-
-    //     //if containing folder does not exist - it shouldnt since no existing copy
-    //     // create it
-    //     console.log("creating folder __", name, " in ", foreign);
-    //     pID = (await this.createFolder(foreignID, "__" + name)).data.id;
-    //   }
-    // }
-
-    // return pID;
   }
 
-  //TODO
+  //Provides authorized access to the API to downlaod files
   downloadFiles(files, mode) {
     console.log("GGL - Initiating ", files.length, " Downloads");
     return new Promise((resolve) => {
@@ -369,48 +288,13 @@ class googleAuth {
         }
       );
 
-      // resp.on("data", () => {
-      //   console.log("GGL DOWNLOAD: Data");
-      // });
-      // resp.on("end", () => {
-      //   console.log("GGL DOWNLOAD: Finsihed");
-      // });
-
       return resp.then((val) => {
-        //console.log("GGL RESP:", val);
-        //let total = 0;
-        // val.data.on("data", (chunk) => {
-        //   console.log("GGL: data on data: ", (total += chunk.length));
-        // });
         return val.data;
       });
-
-      return resp;
-      // .on("end", function () {
-      //   console.log("Done");
-      // })
-      // .on("error", function (err) {
-      //   console.log("Error during download", err);
-      // })
-      // .pipe(dest);
-      // .on("data", (data) => {
-      //   console.log("download Progress++", data);
-      // })
-      // .on("end", () => {
-      //   console.log(
-      //     "Part ",
-      //     fileId,
-      //     " Download Success | See ",
-      //     DOWNLOADS_DIR
-      //   );
-      // })
-      // .on("error", (err) => {
-      //   console.log("File ", file.name, " Part Download Failure:", err);
-      // })
-      // .pipe(dest);
     }
   }
 
+  // Creates a folder, in a given parent
   createFolder(parent, name) {
     let metaData = {
       name,
@@ -434,6 +318,7 @@ class googleAuth {
     });
   }
 
+  // Creates a partitoin folder - a folder prepended it "p_" and is found in top level.
   createPartitionFolder(name) {
     const parentId = ROOTID;
     let metaData = {
@@ -458,6 +343,7 @@ class googleAuth {
     });
   }
 
+  // Create a folder based on a provided path
   createFolderByPath(path, name) {
     const parentId = path[path.length - 1][1]["google"][0];
     let metaData = {

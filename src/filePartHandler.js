@@ -6,6 +6,7 @@ const { content } = require("googleapis/build/src/apis/content");
 const { off } = require("process");
 const { isCompositeComponent } = require("react-dom/test-utils");
 class filePartHandler {
+  //Generate a Hash of a read streams contents
   genContentHash(rs, type) {
     return new Promise((resolve, reject) => {
       let hash;
@@ -27,28 +28,18 @@ class filePartHandler {
     });
   }
 
-  /**
-   *
-   * @param {object Object} file file meta data
-   * @param {array} vendors array of string ids for recipient vendors
-   * @param {object} config upload config - chunksize default:4194304(4MB)
-   * @returns {object} looks like: {"google":[{part1, part3}], "dropbox":[{part2, part4}]}
-   */
+  //Constructs the individual file parts to be uploaded, from a given path
   async buildParts(
     { fileInfo, existingFileData },
     { targets, blockWidth: chunkSize = 5242880, recoveryDensity, mode }
   ) {
-    //! Have targets, so also have usage - can distribute based on that
-    //! will also need to set usage limits at some point though from front end
     const { uploadType, isSmart } = mode;
-    const { name, path, size } = fileInfo;
+    const { path, size } = fileInfo;
     const vendorList = Object.keys(targets);
 
-    chunkSize = 16384;
-    recoveryDensity = 100;
-    const recoveryStepSize = 1;
-    //const recoveryStepSize = Math.round(1 / recoveryDensity) || 1;
+    const recoveryStepSize = recoveryDensity;
 
+    //Build maps to store parts
     const toUpload = vendorList.reduce((acc, v) => (acc[v] = []) && acc, {}),
       toDelete = vendorList.reduce((acc, v) => (acc[v] = []) && acc, {}),
       toRename = vendorList.reduce((acc, v) => (acc[v] = []) && acc, {});
@@ -59,8 +50,6 @@ class filePartHandler {
       step = 1;
 
     //chunk entire file
-    //console.log("PH Recieved Config:", mode);
-    //console.log("PH Recieved FileDetails:", fileInfo);
     if (parseInt(uploadType) === 0) {
       //simple - upload file as single unit, to first drive with space, delete existing file
       console.log("PH Chunking Entrire File");
@@ -132,103 +121,9 @@ class filePartHandler {
         await recovery.call(this);
         return [toUpload, toDelete, toRename];
       }
-    } else if (parseInt(uploadType) === 3) {
-      //mirror stripe - upload as split file, to all connected drives (copied), delete existing parts if not smart
-
-      let fileParts;
-      if (!isSmart || !existingFileData.isData) {
-        fileParts = await this.chunkBetween(path, {
-          start: 0,
-          end: size,
-          chunkSize,
-          counter: partCounter,
-        });
-
-        fileParts.forEach((part) => {
-          for (const vendor of vendorList) {
-            toUpload[vendor].push(part);
-          }
-        });
-
-        if (existingFileData.isData) {
-          for (const [clientId, clientData] of Object.entries(
-            existingFileData.parts
-          )) {
-            toDelete[clientId] = clientData;
-          }
-        }
-      } else if (existingFileData && isSmart) {
-        console.log("PH: INITATING RECOVERY");
-        console.log("size ,", size);
-        while (offset < size) {
-          // Generate a (single) New part
-          const newPart = (
-            await this.chunkBetween(path, {
-              start: offset,
-              end: offset + chunkSize + 1,
-              chunkSize,
-              counter: partCounter,
-            })
-          )[0];
-
-          //test new part against existing parts
-          for (const [clientID, clientData] of Object.entries(
-            existingFileData.parts
-          )) {
-            for (const [partName, partId] of clientData) {
-              console.log(
-                "PH-Checking Part: Existing vs New",
-                partName,
-                newPart.name
-              );
-              console.log("jello");
-              if (partName.includes(newPart.name.split("_")[0])) {
-                //found hash match
-                console.log("hlleo");
-                console.log("PH: Found Hash Match:", partName, newPart.name);
-                //need to chunk everything that was not matched before this match
-                const fileParts = await this.chunkBetween(path, {
-                  start: lastMatchOffset, // starting at last match - chunk all data before current postition but after the last match
-                  end: offset, //ending at current position
-                  chunkSize,
-                  partCounter,
-                });
-
-                // skip over duplicate (matched) chunk
-                offset += chunkSize;
-                // rember terminal offset of last match location (from end of chunk)
-                lastMatchOffset = offset;
-                // found an (existing) part, so must inc part counter
-                partCounter++;
-
-                if (parseInt(partName.split("_")[1]) !== partCounter) {
-                  //push to toRename
-                  const partNameChecksum = partName.split("_")[0];
-                  toRename[clientID].push([
-                    partNameChecksum + "_" + partCounter,
-                    partId,
-                  ]);
-                } else {
-                  //else dont have to push this matched part - do nothing with this part
-                }
-
-                //distribute new chunks to toUpload
-                // fileParts.forEach((part) => {
-                //   for (const vendor of vendorList) {
-                //     toUpload[vendor].push(part);
-                //   }
-                // });
-              } else {
-                //No match, try very next chunk (at offset+1)
-                console.log("inc offset", offset);
-                offset += step;
-              }
-            }
-          }
-        }
-        //need to build toDelete here (after chunking finished and we know what exists and what is redundant)
-      }
     }
+
+    // return constructed instruction sets
 
     return [toUpload, toDelete, toRename];
 
@@ -273,10 +168,10 @@ class filePartHandler {
                 counter: partCounter,
               });
 
+              //Increment part counter so it is in sync
               partCounter += editedRegionParts.length;
 
-              //console.log("Edited Region", await editedRegionParts);
-
+              // Allocate part Owners
               editedRegionParts.forEach((part, i) => {
                 if (uploadType === 2) {
                   //distribute equally
@@ -284,38 +179,40 @@ class filePartHandler {
                 }
               });
 
+              // Check to see if the position of the part in the local file matches the position in the remote file
+              // if they dont match, instead of reuploading a new copy, just rename the existing one to reflect
+              // its new position
               if (parseInt(partName.split("||")[1]) !== partCounter) {
                 const newName = newPartChecksum + "||" + partCounter;
                 toRename[clientId].push([partId, newName, partName, dbxpath]);
               }
 
+              //Inc. part counter and last match offset to skip the matched chunk
               partCounter += 1;
               lastMatchOffset = offset + chunkSize;
-
-              //edited regions go to toUpload
-
-              // if chunk position no longet correct, need to rename
             }
           }
         }
 
+        //if a match was found, skip over it, else continue to next offset, as determined by the recoveryStep
         offset += isFound ? chunkSize : recoveryStepSize;
-        //partCounter += isFound ? 1 : 0;
       }
 
       //get final data after last match
       const lastData = await this.chunkBetween(path, {
-        start: lastMatchOffset + 1, //start offset found in previous chunk, so +1?
-        end: size, //end offset found in next chunk, so -1?
+        start: lastMatchOffset + 1, //start offset found in previous chunk, so +1
+        end: size, //end offset found in next chunk, so -1
         chunkSize,
         counter: partCounter,
       });
 
+      //Set this final data to be uploaded
       lastData.forEach((part, i) => {
         toUpload[vendorList[i % vendorList.length]].push(part);
       });
 
-      //go through parts again, those not in "foundParts" need to be deleted
+      //Go through parts again, those not in "foundParts" need to be deleted
+      // as they are redundant data
       for (const [clientId, clientData] of Object.entries(
         existingFileData.parts
       )) {
@@ -325,30 +222,31 @@ class filePartHandler {
           }
         }
       }
-      console.log("delete", toDelete);
+
       return;
     }
   }
 
-  // splits a file into chunks, number of chunks depends on start and end param
+  // splits a file into chunks, number of chunks depends on start and end param and chunksize
   async chunkBetween(path, { start, end, chunkSize, counter = 0 }) {
-    //console.log("Generating chunks between bytes:", start, end, "Chunk Size:", chunkSize)
     let parts = [];
     let offset = start;
     if (start === end) return parts;
-    //console.log("PH: Chunking start end chunksize", start, end, chunkSize);
 
     while (offset < end) {
+      // build content part for upload
       const content = fs.createReadStream(path, {
           start: offset,
           end: offset + chunkSize > end ? end : offset + chunkSize,
         }),
+        //build content part for md5 checksum
         contentChecksum = await this.genContentHash(
           fs.createReadStream(path, {
             start: offset,
             end: offset + chunkSize > end ? end : offset + chunkSize,
           })
         ),
+        //build content part for SHA checksum
         contentChecksumSha = await this.genContentHash(
           fs.createReadStream(path, {
             start: offset,
@@ -365,11 +263,8 @@ class filePartHandler {
       part.sha256Checksum = contentChecksumSha;
       part.content = content;
       part.size = offset + chunkSize > end ? end - offset : chunkSize;
-      // if (offset % chunkSize === 0)
-      //   console.log("offset end chunksize", offset, end, chunkSize);
-      //console.log("builtPart at offset end chunksize ", offset, end, chunkSize);
+
       parts.push(part);
-      // if is not returning incremented value, can just use the parent scopes "partCounter"
 
       offset += chunkSize;
     }

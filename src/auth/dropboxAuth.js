@@ -1,27 +1,20 @@
 /* eslint-disable no-useless-concat */
 const fs = require("fs");
 const { Dropbox } = require("dropbox");
-const { file } = require("googleapis/build/src/apis/file");
 const fetch = require("node-fetch");
 const { Readable } = require("stream");
 const Stopwatch = require("statman-stopwatch");
 const stopwatch = new Stopwatch();
 
-const CLIENT_ID = process.env.DROPBOX_AUTH_CLIENT_ID,
-  CLIENT_SECRET = process.env.DROPBOX_AUTH_CLIENT_SECRET,
-  REDIRECT_URIS = process.env.DROPBOX_AUTH_REDIRECT_URIS,
-  SCOPES = process.env.DROPBOX_AUTH_SCOPES,
-  TOKEN_PATH = process.env.DROPBOX_TOKEN_PATH,
-  DOWNLOADS_DIR = process.env.DOWNLOAD_PATH,
+const TOKEN_PATH = process.env.DROPBOX_TOKEN_PATH,
   VENDOR_NAME = "dropbox",
-  ROOTID = "/",
-  CHECKSUM_TEMPLATE = "checksums";
-
+  ROOTID = "/";
 class dropboxAuth {
   constructor() {
     this.vendor = VENDOR_NAME;
   }
 
+  //Authorizes any client action using their access token
   async authorize(callback) {
     const result = (async () => {
       const config = {
@@ -53,6 +46,7 @@ class dropboxAuth {
     return DROPBOX_ACESSTOKEN;
   }
 
+  //returns a list of all the meta data of every file on a drive
   async listFiles(listPath) {
     const resp = this.authorize((client) => {
       return _listFiles(client, listPath);
@@ -60,6 +54,7 @@ class dropboxAuth {
 
     return resp.then((v) => {
       let entries = v.result.entries;
+      //Apply Origin Tag
       return { origin: "dropbox", entries };
     });
 
@@ -67,21 +62,18 @@ class dropboxAuth {
       return client.filesListFolder({
         path,
         recursive: true,
-        // include_property_groups: {
-        //   // ".tag": "filter_some",
-        //   // filter_some: ["id"],
-        // },
       });
     }
   }
 
+  // Provides Authorized API access to delete files
   deleteFiles(files) {
-    let partCounter = 0;
+    //No Files, exit
     if (files.length === 0) return;
-    console.log("DBX: attempting to delete ", files.length, " files");
+
+    //Authorize and unpack
     this.authorize((client) => {
       files.forEach((file) => {
-        console.log("detelging file", file);
         _deleteFile(client, file);
       });
     });
@@ -96,9 +88,10 @@ class dropboxAuth {
     }
   }
 
+  // Provides Authorized API access to rename a file resource
   renameFiles(files) {
     if (files.length === 0) return;
-    console.log("DBX: attempting to rename ", files.length, " files");
+
     this.authorize((client) => {
       files.forEach((file) => {
         const [id, name, newName, path] = file;
@@ -118,6 +111,7 @@ class dropboxAuth {
     }
   }
 
+  // Provides Authorized API access to Upload a file resource
   uploadFiles(files, targetInfo, mode) {
     const { uploadType } = mode;
     let fileCounter = 1,
@@ -142,7 +136,6 @@ class dropboxAuth {
           parts[0].name = fileInfo.name;
 
         fileInfo.path = this.findPath(file, targetInfo, mode);
-        console.log("DBX: Dropbox upload Path", fileInfo.path);
         let responses = [];
         stopwatch.start();
         parts.forEach((part) => {
@@ -154,52 +147,29 @@ class dropboxAuth {
         Promise.all(responses).then(() => console.log(stopwatch.stop()));
       });
       partCounter = 1;
-      fileCounter++;
     });
 
     async function _uploadFile(client, fileInfo, fileContent, pNum, maxParts) {
       const contents = fileContent.content,
         path = fileInfo.path + fileContent.name;
-      //console.log("DBX install path:",path)
-
-      //if (pNum === 1) stopwatch.start();
-      // let template = {
-      //   name: "checksums",
-      //   description: "md5 and sha256 cheksums",
-      //   type: { ".tag": "string" },
-      // };
-
-      // const tmp = await client.filePropertiesTemplatesAddForUser({
-      //   name: "User",
-      //   description: "checksumTemplate",
-      //   fields: [template],
-      // });
-
-      // let field = { name: "checksums", value: "THISISACHECKSUM" };
-      // let propertyGroup = {
-      //   template_id: tmp.result.template_id,
-      //   fields: [field],
-      // };
 
       const resp = client.filesUpload(
         {
           contents,
           path,
-          // property_groups: [propertyGroup],
         },
         (err, resp) => {
           if (resp && pNum === maxParts)
             console.log("dropbox:", stopwatch.stop());
         }
       );
-      //resp.then((message) => console.log("DBX Upload Response:", message));
-      //if (pNum === maxParts)
-      //resp.then(() => console.log("dropbox:", stopwatch.stop()));
+
       console.log("DBX resp", resp);
       return resp;
     }
   }
 
+  // Provides Authorized API access to Download a file resource
   downloadFiles(files) {
     console.log("DBX - Initiating ", files.length, " Downloads");
     return new Promise((resolve) => {
@@ -213,7 +183,6 @@ class dropboxAuth {
     });
 
     async function _downloadFile(client, fileId) {
-      // const dest = fs.createWriteStream("./dropboxPipe.txt");
       const resp = client.filesDownload({
         path: fileId,
       });
@@ -221,15 +190,13 @@ class dropboxAuth {
       return resp.then((val) => {
         return Readable.from(val.result.fileBinary);
       });
-
-      // return resp;
-      // //resp.result
     }
   }
 
-  //is zipped
+  //is zipped - needs special enpoint
   downloadFolder() {}
 
+  //Gets the space usage of the drive
   getSpaceUsage() {
     const resp = this.authorize((client) => {
       return client.usersGetSpaceUsage();
@@ -244,6 +211,7 @@ class dropboxAuth {
     });
   }
 
+  //Creates a folder in the top level of the drives directoy
   createPartitionFolder(name) {
     const tPath = "/" + name;
 
@@ -254,6 +222,7 @@ class dropboxAuth {
     });
   }
 
+  //Creates a folder in the directory of the passed path
   createFolderByPath(path, name) {
     let tPath =
       "/" +
@@ -264,8 +233,6 @@ class dropboxAuth {
 
     tPath += name;
 
-    console.log("dropboxCreatefolder", tPath);
-
     return this.authorize((client) => {
       return client.filesCreateFolderV2({
         path: tPath,
@@ -273,14 +240,13 @@ class dropboxAuth {
     });
   }
 
+  // finds the correct path for install, provided the partiton the file was "dropped" into
   findPath(
     { fileInfo, existingFileData },
     { droppedContainer, droppedPath },
-    { uploadType, isSmart }
+    { uploadType }
   ) {
     const { name } = fileInfo;
-    //cutting off extension
-    //name = name.split(".").slice(0, -1).join(".");
     const vID = this.vendor;
     let path;
 
@@ -292,13 +258,7 @@ class dropboxAuth {
       return acc + name + "/";
     }, "");
 
-    console.log("DBX: Findpath tpath", tPath);
-    console.log(
-      "DBX: Dropped Container keys",
-      Object.keys(droppedContainer.mergedIDs)
-    );
     if (Object.keys(droppedContainer.mergedIDs).includes(vID)) {
-      console.log("DBX: Key found");
       if (existingFileData.isData) {
         if (parseInt(uploadType) === 0 || parseInt(uploadType) === 1)
           path = ROOTID + tPath;
@@ -309,17 +269,6 @@ class dropboxAuth {
         else path = ROOTID + tPath + "__" + name + "/";
       }
     }
-    // } else {
-    //   console.log("DBX is non-primary Recipent");
-
-    //   let foreign = foreignFolders[vID];
-
-    //   if (existingFileData[vID]) {
-    //     path = ROOTID + "__foreign__" + "/__" + name + "/";
-    //   } else {
-    //     path = ROOTID + "__foreign__" + "/__" + name + "/";
-    //   }
-    // }
 
     return path;
   }

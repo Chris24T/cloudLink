@@ -36,20 +36,6 @@ function createWindow() {
   //win.setMenu(null)
 }
 
-function openDialogue() {
-  const win2 = new BrowserWindow({ width: 800, height: 600 });
-  const options = {
-    properties: ["openFile", "multiSelections"],
-    title: "selectFile",
-  };
-
-  dialog.showOpenDialog({ properties: ["openFile", "multiSelections"] });
-
-  let filePaths = dialog.showOpenDialog(win2, options);
-  filePaths.then((p) => console.log("Paths", p));
-  //console.log("paths", filePaths);
-}
-
 /**
  * Initialize the application
  */
@@ -59,7 +45,7 @@ const init = () => {
   //openDialogue()
 
   /**
-   * Add an IPC event listener for the channel
+   * Add an IPC event listeners for the channel
    */
   ipcMain.on("FileBrowser-Render-Request", async (e, messageContent) => {
     const response = await handleRequest(messageContent);

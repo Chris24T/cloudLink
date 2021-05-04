@@ -45,7 +45,7 @@ function File(props) {
         </Card>
 
     )
-        //<p>{fileId = props.id && props.id}</p> 
+        
    
 
     
@@ -53,9 +53,5 @@ function File(props) {
 }
 
 
-//callback in case want to do something with file
-//can be used to download current file: file.downloadFile()
-//or download another file
 
-// might have to get each thumbnail from multiple seperate requests to individual files.
 export default File
