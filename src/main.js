@@ -47,7 +47,7 @@ function openDialogue() {
 
   let filePaths = dialog.showOpenDialog(win2, options);
   filePaths.then((p) => console.log("Paths", p));
-  console.log("paths", filePaths);
+  //console.log("paths", filePaths);
 }
 
 /**

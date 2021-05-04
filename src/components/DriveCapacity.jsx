@@ -76,10 +76,13 @@ function DriveCapacity(props) {
         const driveusage = globalUsage.current
         //console.log("Total Drive Usage", driveusage)      
         //console.log("Total Partition Size", currentFolderSize)
-        const googleUsed = parseInt(currentFolderSize[0][1])
-        const dropboxUsed = parseInt(currentFolderSize[1][1])
+        let googleUsed = parseInt(currentFolderSize[0][1])
+        let dropboxUsed = parseInt(currentFolderSize[1][1])
         const googleAlloc = parseInt(currentFolderSize[0][0])
         const dropboxAlloc = parseInt(currentFolderSize[1][0])
+
+        if(googleUsed < 0) googleUsed = 0
+        if(dropboxUsed < 0) dropboxUsed = 0
 
         const totalAlloc = googleAlloc+dropboxAlloc
 
@@ -99,20 +102,23 @@ function DriveCapacity(props) {
             <div id="capacity-Merged">
                 <span>Total Partition Space Use: {convertUnits(totalUsedMerge)} of Reserved {convertUnits(totalAllocMerge)}</span>
                 <div style={{width:"100%", borderStyle:"solid", borderWidth:"2px"}} class="progress" id="allocationBar">
-                    <div class="progress-bar" id="allocaltionBar-Google" role="progressbar" style={{width:mergeGoogleWidth, backgroundColor:"yellow", borderRight:"1px solid black"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
-                    <div class="progress-bar" id="allocationBar-Dropbox" role="progressbar" style={{width:mergeDropboxWidth, backgroundColor:"blue", borderRight:"1px solid black"}} aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>               
+                    {googleAlloc < 1 ? "" : <div class="progress-bar" id="allocaltionBar-Google" role="progressbar" style={{width:mergeGoogleWidth, backgroundColor:"yellow", borderRight:"1px solid black"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div> }
+                    {dropboxAlloc < 1 ? "" : <div class="progress-bar" id="allocationBar-Dropbox" role="progressbar" style={{width:mergeDropboxWidth, backgroundColor:"blue", borderRight:"1px solid black"}} aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>   }            
                 </div>
             </div>
             
-            <div id="cacpity-individual" style={{overflow:"hidden"}}>
-            <span>Google Partition Usage: {convertUnits(googleUsed)} of Reserved {convertUnits(googleAlloc)} </span>
+            <div id="capacity-individual" style={{overflow:"hidden"}}>
+                {googleAlloc < 1 ? "" : <div><span>Google Allocation Usage: {convertUnits(googleUsed)} of Reserved {convertUnits(googleAlloc)} </span>
                 <div style={{width:"100%", borderStyle:"solid", borderWidth:"2px"}} class="progress" id="allocationBar">
                     <div class="progress-bar" id="allocaltionBar-Google" role="progressbar" style={{width:googleWidth, backgroundColor:"yellow", borderRight:"1px solid black"}} aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
-                </div>
-            <span>Dropbox Partition Usage: {convertUnits(dropboxUsed)} of Reserved {convertUnits(dropboxAlloc)} </span>
+                </div> </div>}
+
+                {dropboxAlloc < 1 ? "" : <div> <span>Dropbox Allocation Usage: {convertUnits(dropboxUsed)} of Reserved {convertUnits(dropboxAlloc)} </span>
                 <div style={{width:"100%", borderStyle:"solid", borderWidth:"2px"}} class="progress" id="allocationBar">                
                     <div class="progress-bar" id="allocationBar-Dropbox" role="progressbar" style={{width:dropboxWidth, backgroundColor:"blue", borderRight:"1px solid black"}} aria-valuenow="30" aria-valuemin="0" aria-valuemax="100"></div>               
-                </div>            
+                </div>  </div>}
+            
+                      
             </div>
             </React.Fragment>
         )
@@ -121,6 +127,8 @@ function DriveCapacity(props) {
 
 
 }
+
+
 
 function growCapBox() {    
 

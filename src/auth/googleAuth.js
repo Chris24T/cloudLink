@@ -2,6 +2,8 @@ const fs = require("fs");
 const readline = require("readline");
 
 const { google } = require("googleapis");
+const Stopwatch = require("statman-stopwatch");
+const stopwatch = new Stopwatch();
 
 const CLIENT_ID = process.env.GOOGLE_AUTH_CLIENT_ID,
   CLIENT_SECRET = process.env.GOOGLE_AUTH_CLIENT_SECRET,
@@ -181,13 +183,20 @@ class googleAuth {
           parts[0].name = fileInfo.name;
 
         fileInfo.parent = await this.findParent(file, targetInfo, mode);
-
+        const responses = [];
+        stopwatch.start();
         parts.forEach((part) => {
-          _uploadFile(client, fileInfo, part, partCounter);
+          responses.push(
+            _uploadFile(client, fileInfo, part, partCounter, parts.length)
+          );
           partCounter++;
         });
         fileCounter++;
         partCounter = 1;
+        //console.log("resps", responses);
+        Promise.all(responses).then((fullfill) => {
+          console.log(stopwatch.stop());
+        });
       });
     });
 
@@ -195,11 +204,11 @@ class googleAuth {
 
     //update - fileid is passed, else no id
 
-    function _uploadFile(client, fileInfo, fileContent, pNum) {
+    function _uploadFile(client, fileInfo, fileContent, pNum, maxParts) {
       const { parent } = fileInfo;
       const { name, content } = fileContent;
 
-      content.on("data", (chunk) => console.log("sub-Chunk uploaded", chunk));
+      //content.on("data", (chunk) => console.log("sub-Chunk uploaded", chunk));
 
       const resource = {
           name,
@@ -211,19 +220,27 @@ class googleAuth {
           //body: content.on("data", chunk => console.log("sub-Chunk uploaded", chunk))
           body: content,
         };
+      //if (pNum === 1) stopwatch.start();
 
-      client.files.create(
-        {
-          resource,
-          media,
-          fields: "id",
-        },
-        (err, resp) => {
-          if (err)
-            return console.log("File: ", name, " Part Upload Failure: ", err);
-          console.log("File: ", name, " part ", pNum, "Upload Success");
-        }
-      );
+      return new Promise((res) => {
+        const resp = client.files.create(
+          {
+            resource,
+            media,
+            fields: "id",
+          },
+          (err, resp) => {
+            if (err)
+              return console.log("File: ", name, " Part Upload Failure: ", err);
+            console.log("File: ", name, " part ", pNum, "Upload Success");
+            res(resp);
+            //if (resp && pNum === maxParts)
+            //console.log("Google: ", stopwatch.stop());
+          }
+        );
+      });
+
+      // if (pNum === maxParts) resp.then(() => console.log(stopwatch.stop()));
     }
   }
 

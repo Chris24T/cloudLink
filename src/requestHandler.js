@@ -17,7 +17,7 @@ function handleRequest(request) {
     reqType = request[0].requestType;
   //console.log("requestType", requestOptions[reqType]);
   const response = requestOptions[reqType](params, data);
-  console.log("Responding");
+  //console.log("Responding");
   return response;
 }
 

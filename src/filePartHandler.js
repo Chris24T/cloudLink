@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const { content } = require("googleapis/build/src/apis/content");
 const { off } = require("process");
+const { isCompositeComponent } = require("react-dom/test-utils");
 class filePartHandler {
   genContentHash(rs, type) {
     return new Promise((resolve, reject) => {
@@ -35,7 +36,7 @@ class filePartHandler {
    */
   async buildParts(
     { fileInfo, existingFileData },
-    { targets, blockWidth: chunkSize = 4194304, recoveryDensity, mode }
+    { targets, blockWidth: chunkSize = 5242880, recoveryDensity, mode }
   ) {
     //! Have targets, so also have usage - can distribute based on that
     //! will also need to set usage limits at some point though from front end
@@ -43,7 +44,10 @@ class filePartHandler {
     const { name, path, size } = fileInfo;
     const vendorList = Object.keys(targets);
 
-    const recoveryStepSize = Math.round(1 / recoveryDensity);
+    chunkSize = 16384;
+    recoveryDensity = 100;
+    const recoveryStepSize = 1;
+    //const recoveryStepSize = Math.round(1 / recoveryDensity) || 1;
 
     const toUpload = vendorList.reduce((acc, v) => (acc[v] = []) && acc, {}),
       toDelete = vendorList.reduce((acc, v) => (acc[v] = []) && acc, {}),
@@ -55,8 +59,8 @@ class filePartHandler {
       step = 1;
 
     //chunk entire file
-    console.log("PH Recieved Config:", mode);
-    console.log("PH Recieved FileDetails:", fileInfo);
+    //console.log("PH Recieved Config:", mode);
+    //console.log("PH Recieved FileDetails:", fileInfo);
     if (parseInt(uploadType) === 0) {
       //simple - upload file as single unit, to first drive with space, delete existing file
       console.log("PH Chunking Entrire File");
@@ -155,7 +159,7 @@ class filePartHandler {
         }
       } else if (existingFileData && isSmart) {
         console.log("PH: INITATING RECOVERY");
-
+        console.log("size ,", size);
         while (offset < size) {
           // Generate a (single) New part
           const newPart = (
@@ -229,7 +233,7 @@ class filePartHandler {
     return [toUpload, toDelete, toRename];
 
     async function recovery() {
-      console.log("PH: INITATING RECOVERY");
+      console.log("INITATING RECOVERY");
       let isFound = false;
       let foundParts = JSON.parse(JSON.stringify(toDelete));
       while (offset < size) {
@@ -277,8 +281,6 @@ class filePartHandler {
                 if (uploadType === 2) {
                   //distribute equally
                   toUpload[vendorList[i % vendorList.length]].push(part);
-                } else if (uploadType === 3) {
-                  //duplicate across both
                 }
               });
 
@@ -300,6 +302,18 @@ class filePartHandler {
         offset += isFound ? chunkSize : recoveryStepSize;
         //partCounter += isFound ? 1 : 0;
       }
+
+      //get final data after last match
+      const lastData = await this.chunkBetween(path, {
+        start: lastMatchOffset + 1, //start offset found in previous chunk, so +1?
+        end: size, //end offset found in next chunk, so -1?
+        chunkSize,
+        counter: partCounter,
+      });
+
+      lastData.forEach((part, i) => {
+        toUpload[vendorList[i % vendorList.length]].push(part);
+      });
 
       //go through parts again, those not in "foundParts" need to be deleted
       for (const [clientId, clientData] of Object.entries(
@@ -350,7 +364,7 @@ class filePartHandler {
       part.md5Checksum = contentChecksum;
       part.sha256Checksum = contentChecksumSha;
       part.content = content;
-      part.size = offset + chunkSize > end ? end - offset : offset + chunkSize;
+      part.size = offset + chunkSize > end ? end - offset : chunkSize;
       // if (offset % chunkSize === 0)
       //   console.log("offset end chunksize", offset, end, chunkSize);
       //console.log("builtPart at offset end chunksize ", offset, end, chunkSize);

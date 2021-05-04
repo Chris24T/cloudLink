@@ -4,6 +4,8 @@ const { Dropbox } = require("dropbox");
 const { file } = require("googleapis/build/src/apis/file");
 const fetch = require("node-fetch");
 const { Readable } = require("stream");
+const Stopwatch = require("statman-stopwatch");
+const stopwatch = new Stopwatch();
 
 const CLIENT_ID = process.env.DROPBOX_AUTH_CLIENT_ID,
   CLIENT_SECRET = process.env.DROPBOX_AUTH_CLIENT_SECRET,
@@ -141,20 +143,26 @@ class dropboxAuth {
 
         fileInfo.path = this.findPath(file, targetInfo, mode);
         console.log("DBX: Dropbox upload Path", fileInfo.path);
+        let responses = [];
+        stopwatch.start();
         parts.forEach((part) => {
-          _uploadFile(client, fileInfo, part, partCounter);
+          responses.push(
+            _uploadFile(client, fileInfo, part, partCounter, parts.length)
+          );
           partCounter++;
         });
+        Promise.all(responses).then(() => console.log(stopwatch.stop()));
       });
       partCounter = 1;
       fileCounter++;
     });
 
-    async function _uploadFile(client, fileInfo, fileContent, pNum) {
+    async function _uploadFile(client, fileInfo, fileContent, pNum, maxParts) {
       const contents = fileContent.content,
         path = fileInfo.path + fileContent.name;
       //console.log("DBX install path:",path)
 
+      //if (pNum === 1) stopwatch.start();
       // let template = {
       //   name: "checksums",
       //   description: "md5 and sha256 cheksums",
@@ -178,15 +186,16 @@ class dropboxAuth {
           contents,
           path,
           // property_groups: [propertyGroup],
+        },
+        (err, resp) => {
+          if (resp && pNum === maxParts)
+            console.log("dropbox:", stopwatch.stop());
         }
-        // (err) => {
-        //   console.log(err);
-        //   console.log(resp);
-        //   return err;
-        // }
       );
-      resp.then((message) => console.log("DBX Upload Response:", message));
-
+      //resp.then((message) => console.log("DBX Upload Response:", message));
+      //if (pNum === maxParts)
+      //resp.then(() => console.log("dropbox:", stopwatch.stop()));
+      console.log("DBX resp", resp);
       return resp;
     }
   }

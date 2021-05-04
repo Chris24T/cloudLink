@@ -88,7 +88,8 @@ function FilesBrowser(prps) {
       //console.log("usage", usage)
       //setCurrentFolderSize([google, dropbox])
       setCurrentFolderSize(usage)
-    }, [dirStack.current.length < 2])
+    }, [dirStack.current.length])
+    
     
     function findForeignFolders() {
       const foreignFolders = {}
@@ -248,7 +249,18 @@ function FilesBrowser(prps) {
       uploadFiles(toUpload, partitionInfo, targetInfo)
     })
 
-    const onDrop = useCallback ( (droppedFiles, rejected) => {
+    function testDrop() {
+
+
+
+      let paths = [{path:"/home/chris/Work/programs/yr3Project/testFiles/test7", name:"test7", size:83886080    }]
+
+      
+
+      onDrop(paths)
+    }
+
+    const onDrop = useCallback ( (droppedFiles) => {
 		const directory = dirStack.current
 		const partitionName = directory.length
 
@@ -261,8 +273,9 @@ function FilesBrowser(prps) {
     return (
       
       <React.Fragment>   
-      <Route exact path="/">        
-      <HomeView content={displayMode === "advanced" ? displayedFiles : buildDisplay(displayedFiles, findForeignFolders(),fileTree.current)} dirStack={dirStack}/>
+      <Route exact path="/"> 
+           
+      <HomeView test={() => testDrop()} content={displayMode === "advanced" ? displayedFiles : buildDisplay(displayedFiles, findForeignFolders(),fileTree.current)} dirStack={dirStack}/>
       </Route>
 
       <Route path="/trash"  >        
@@ -598,8 +611,8 @@ function FilesBrowser(prps) {
       for (const folder of Object.values(fileTree.current)) {
         if(folder.isPartitionFolder) {
           
-          googleReserved += parseInt(folder.partitionConfig?.fulfillmentValue[0].targets?.google?.limit || 0)
-          dropboxReserved += parseInt(folder.partitionConfig?.fulfillmentValue[0].targets?.dropbox?.limit || 0)
+          googleReserved += parseInt(folder.partitionConfig?.fulfillmentValue[0]?.targets?.google?.limit || 0)
+          dropboxReserved += parseInt(folder.partitionConfig?.fulfillmentValue[0]?.targets?.dropbox?.limit || 0)
         }
       }
       return {googleReserved, dropboxReserved}
@@ -607,6 +620,7 @@ function FilesBrowser(prps) {
 
     function updateAllocation({googleRemaining:googleTotal=1000, dropboxRemaining:dropboxTotal=1000}) {     
       const inputs = document.getElementsByClassName("form-number-input")
+      // const type = document.getElementById()
       // console.log("googs", googleTotal)
       const gglAlloc = (inputs[0].value * 1024 * 1024) || 0
       const dbxAlloc = (inputs[1].value * 1024 * 1024)|| 0
@@ -620,7 +634,7 @@ function FilesBrowser(prps) {
 
     }
 
-  function HomeView({content, dirStack}) {
+  function HomeView({content, dirStack, test}) {
     //console.log("Rendering Content:", content)
     const {getRootProps, getInputProps, isDragActive} = useDropzone({onDrop})
 
@@ -641,7 +655,7 @@ function FilesBrowser(prps) {
       
       <div {...getRootProps( {onClick: e => e.stopPropagation(), id:"FileBrowser-Container"})} style={{}}>
           <input {...getInputProps()} />
-          
+          {/* <button style={{left:"50px", width:"50px", height:"25px", zIndex:"10"}} onClick={test}>Test</button>   */}
 
           {            
             //isDragActive ? <p>drop here</p> : <p>drag and drop a file anywhere to upload</p>
@@ -781,7 +795,7 @@ function FilesBrowser(prps) {
     ipcRenderer.send(CHANNEL_NAME_REQ, [request])
   }
 
-  function buildDisplay(toDisplay, foreigns, allFiles) {
+  function buildDisplay(toDisplay) {
     
     const newDisplay = {}  
 

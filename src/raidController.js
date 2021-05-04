@@ -11,6 +11,7 @@ const { computeChecksum, eventChannel } = require("./helpers");
 const { checkServerIdentity } = require("tls");
 const { isCompositeComponent } = require("react-dom/test-utils");
 const { ipcMain } = require("electron");
+
 const Promise = require("bluebird");
 
 /**
@@ -121,33 +122,59 @@ class raidController {
     const { targets, mode, isTracked } = config; //partitionConfig
     let recipients = Object.keys(targets);
 
-    console.log("RC: Upload Target Info", targetInfo);
-    console.log("RC: Upload Files", files);
-    console.log("TrackStatus:", isTracked);
+    // console.log("RC: Upload Target Info", targetInfo);
+    // console.log("RC: Upload Files", files);
+    // console.log("TrackStatus:", isTracked);
+    const Stopwatch = require("statman-stopwatch");
+    const localstopwatch = new Stopwatch();
 
     if (isTracked) addtrackedFiles(config, targetInfo, files);
 
     files.forEach(async (file) => {
+      localstopwatch.start();
       const [
         toUploadParts,
         toDeleteParts,
         toRenameParts,
       ] = await partHandler.buildParts(file, config); // width is being passed from config
+      console.log("Rsync duration: ", localstopwatch.stop());
+      // const totalSize = Object.values(toUploadParts).reduce((acc, el, i) => {
+      //   console.log("el i", i);
+      //   for (const part of el) {
+      //     console.log("part size:", part.size);
+      //     acc += part.size;
+      //     return acc;
+      //   }
+      // }, 0);
 
-      console.log("RC: Parts To Upload", toUploadParts);
+      let total = 0;
+
+      for (const setOfPats of Object.values(toUploadParts)) {
+        for (const part of setOfPats) {
+          total += part.size;
+        }
+      }
+
+      console.log("StartSize: ", file.fileInfo.size, " Upload Size: ", total);
+
+      // console.log("RC: Parts To Upload", toUploadParts);
+      let responses = [];
 
       callClients((clientId, client) => {
         // upload new data - edits
-        console.log("RC: todelete", toDeleteParts);
+        //console.log("RC: todelete", toDeleteParts);
         client.deleteFiles(toDeleteParts[clientId]);
 
         //timeout for api rate limits
         setTimeout(() => {
           // delete redundant data
-          client.uploadFiles(
-            [{ file, parts: toUploadParts[clientId] }],
-            targetInfo,
-            mode
+
+          responses.push(
+            client.uploadFiles(
+              [{ file, parts: toUploadParts[clientId] }],
+              targetInfo,
+              mode
+            )
           );
         }, 1000);
 
@@ -197,7 +224,7 @@ class raidController {
         try {
           const currentChecksum = await computeChecksum(path);
           //console.log("cur", currentChecksum, "last", md5Checksum);
-          console.log("cur ", currentChecksum, " vs ", md5Checksum);
+          //console.log("cur ", currentChecksum, " vs ", md5Checksum);
           if (currentChecksum !== md5Checksum) {
             //reupload file, by path, to its current location.
             //need to get all file info from tracksDB

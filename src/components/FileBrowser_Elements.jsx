@@ -384,14 +384,28 @@ export function Control_Bar(props) {
     uploads = ["a", 1 ,2, 2]
     downloads = [1, 2, 3, 4]
     return (
-        <div id="ControlBar">
+        <div style={{position:"sticky"}}id="ControlBar">
             
             <ProgressBarsBox />
 
-            <div id="buttons">
+            <div id="buttons" style={{width:"100%"}}>
                 
                 <button className="btn btn-primary" onClick={toggleDisplayMode}>Toggle DisplayMode</button>
                 
+                <div style={{display:"flex", flexDirection:"column", width:"150px", position:"absolute", right:"20px", bottom:"15px", borderStyle:"solid"}}>
+                    Key
+                    <div>
+                    <div className="dot" style={{backgroundColor:"yellow"}}></div>
+                    Google
+                    </div>
+                
+                <div>
+                <div className="dot" style={{backgroundColor:"blue"}}></div>Dropbox
+                </div>
+                
+                </div>
+                
+
             </div>
         </div>
     )
